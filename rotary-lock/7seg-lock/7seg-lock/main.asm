@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Assembly Language file for lab 3 (Embedded Systems)
 ; Fall 2022, The University of Iowa.
-; Gustav Champlin, Brandon Egger
+; Brandon Egger
 ; 9/25/2022
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 .include "m328Pdef.inc"
