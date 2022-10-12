@@ -1,0 +1,45 @@
+.include "m328Pdef.inc"
+.cseg
+.org 0
+; configure PB0-PB2 as output pins
+sbi   DDRB,0	; PB0 is output (for SER)
+sbi   DDRB,1	; PB1 is output (for RCLK)
+sbi   DDRB,2	; PB2 is output (for SRCLK)
+
+; start main program
+
+; display a digit
+ldi R16, 0x70 ; load pattern to display
+rcall display ; call display subroutine
+
+display:
+   ; backup used registers on stack
+   push R16
+   push R17
+   in R17, SREG
+   push R17
+   
+   ldi R17, 8 ; loop --> test all 8 bits
+loop:
+   rol R16 ; rotate left through Carry
+   BRCS set_ser_in_1 ; branch if Carry is set
+   ; insert code to set SER to 0
+   
+   rjmp end
+set_ser_in_1:
+   ; insert code to set SER to 1
+end:
+   ; insert code to make SRCLK pulse
+   
+   dec R17
+   brne loop
+   
+   ; insert code to make RCLK pulse
+   
+   ; restore regs from stack
+   pop R17
+   out SREG, R17
+   pop R17
+   pop R16
+   
+   ret
