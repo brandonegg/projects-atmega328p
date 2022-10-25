@@ -123,18 +123,18 @@ ldi r16, 7  ; 16MHz -> .1 / (6.25E-8 * 1024 * 256) ~= 7
 
 delay_100ms:
    ldi tmp2, 0x00
-   out TCCR0B, tmp2  ; stop timer 0
-   in tmp2, TIFR0
-   sbr tmp2, 1<<TOV0 ; TOV0 is # of bit its stored at. So we shift 1 that many bytes
-   out TIFR0, tmp2   ; clear overflow flag
+   out TCCR2B, tmp2  ; stop timer 0
+   in tmp2, TIFR2
+   sbr tmp2, 1<<TOV2 ; TOV0 is # of bit its stored at. So we shift 1 that many bytes
+   out TIFR2, tmp2   ; clear overflow flag
 
    ldi tmp2, 0     ;
    ldi tmp1, 0b101   ; load configuration
-   out TCNT0, tmp2   ; load to 0 start point
-   out TCCR0B, tmp1  ; Load config (starts timer)
+   out TCNT2, tmp2   ; load to 0 start point
+   out TCCR2B, tmp1  ; Load config (starts timer)
 lcd_startup_wait:
-   in tmp2, TIFR0
-   sbrs tmp2, TOV0             ; Wait until timer done
+   in tmp2, TIFR2
+   sbrs tmp2, TOV2             ; Wait until timer done
    rjmp lcd_startup_wait
 
    dec r16
@@ -164,13 +164,16 @@ main:
 test:
    rjmp test
 
+;***************************************************************************
+; Commonly used timers (all utilizing timer2)
+;***************************************************************************
 delay_5ms: ; 5 ms timer
    push tmp1
    push tmp2
 
    ldi tmp2, 0x00
    sts TCCR2B, tmp2  ; stop timer 0
-   in tmp2, TIFR0
+   in tmp2, TIFR2
    sbr tmp2, 1<<TOV2 ; TOV0 is # of bit its stored at. So we shift 1 that many bytes
    out TIFR2, tmp2   ; clear overflow flag
 
