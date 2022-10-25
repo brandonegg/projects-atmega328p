@@ -115,9 +115,9 @@ init_timer0:
 	settimer0		; configure timer0 as PWM
 	; PWM should automatically operate fan
 
-
-; START DISPLAY CODE
-
+;***************************************************************************
+; Main initialization routine
+;***************************************************************************
 ; WAITING 0.1 seconds before beginning (required by LCD)
 ldi r16, 7  ; 16MHz -> .1 / (6.25E-8 * 1024 * 256) ~= 7
 
@@ -156,6 +156,9 @@ init_lcd_loop:
    rjmp init_lcd_loop
 ; LCD INITIALIZATION COMPLETE
 
+;***************************************************************************
+; Main rotuine after initialization has occured
+;***************************************************************************
 main:
    rcall display_lcd
 test:
@@ -171,7 +174,7 @@ delay_5ms: ; 5 ms timer
    sbr tmp2, 1<<TOV2 ; TOV0 is # of bit its stored at. So we shift 1 that many bytes
    out TIFR2, tmp2   ; clear overflow flag
 
-   ldi tmp2, 170      ; 256 - (5E-3/(6.25E-8*8*1024)) - round up
+   ldi tmp2, 170     ; 256 - (5E-3/(6.25E-8*8*1024)) - round up
    ldi tmp1, 0b111   ; load configuration
    sts TCNT2, tmp2   ; load to 5ms start point
    sts TCCR2B, tmp1  ; Load config (starts timer)
@@ -223,6 +226,10 @@ delay_100u:          ; 100us timer
    pop tmp1
    rjmp timer_loop
 
+;***************************************************************************
+; The following is the main LCD display subroutine. Each step handles a
+; different portion of the display functionality.
+;***************************************************************************
 display_lcd:
    rcall display_upper
    ret
@@ -238,39 +245,6 @@ display_upper_lcd:
    rcall display_numbers
    ldi letter, 0x25
    rcall display_letter   ; Display percent
-   ret
-
-display_numbers:             ; uses letter as 'number'
-   rcall shift_cursor_right  ; Supports numbers of 3 digits (0-100% is all we need)
-   rcall shift_cursor_right
-   ldi command, 0x04            ; Change to decrement 
-   rcall send_command
-   rcall set_character_mode
-display_numbers_loop:
-   mov r16, letter           ; set dividend - in this case letter is number we are producing
-   ldi r17, 0x0A             ; set divisor
-   rcall div8u
-
-   mov letter, r15
-   ori letter, 0x30
-
-   rcall display_letter
-   cpi r16, 0x0A
-   brlo disp_number_return
-   mov letter, r16
-   rjmp display_numbers_loop
-disp_number_return:
-   mov letter, r16
-   ori letter, 0x30
-   rcall display_letter
-undo_display_shift_mode:
-   ldi command, 0x06            ; Change display mode 
-   rcall send_command
-   rcall shift_cursor_right  ; Supports numbers of 3 digits (0-100% is all we need)
-   rcall shift_cursor_right
-   rcall shift_cursor_right
-   rcall shift_cursor_right
-   rcall set_character_mode
    ret
 
 ;***************************************************************************
@@ -321,6 +295,40 @@ send_command:              ; Generic routine to push whatever command is sitting
 ; display_letter takes a letter stored in the 'letter' register and outputs
 ; this letter to the LCD.
 ;***************************************************************************
+; This will always display numbers with 3 digits, aka 100 shows as 100, 50 returns 50.0% and 0 displays 0.00%
+display_numbers:             ; uses value stored in letter as 'number'
+   rcall shift_cursor_right  ; Supports numbers of 3 digits (0-100% is all we need)
+   rcall shift_cursor_right
+   ldi command, 0x04         ; Change to decrement 
+   rcall send_command
+   rcall set_character_mode
+display_numbers_loop:
+   mov r16, letter           ; set dividend - in this case letter is number we are producing
+   ldi r17, 0x0A             ; set divisor
+   rcall div8u
+
+   mov letter, r15
+   ori letter, 0x30
+
+   rcall display_letter
+   cpi r16, 0x0A
+   brlo disp_number_return
+   mov letter, r16
+   rjmp display_numbers_loop
+disp_number_return:
+   mov letter, r16
+   ori letter, 0x30
+   rcall display_letter
+undo_display_shift_mode:
+   ldi command, 0x06            ; Change display mode 
+   rcall send_command
+   rcall shift_cursor_right  ; Supports numbers of 3 digits (0-100% is all we need)
+   rcall shift_cursor_right
+   rcall shift_cursor_right
+   rcall shift_cursor_right
+   rcall set_character_mode
+   ret
+
 display_letters:            ; Uses z pointer to display letters until 0x00 is reached
    rcall set_character_mode
    lpm letter, Z+
