@@ -43,6 +43,11 @@
 .org 0x00
 rjmp	0x100
 
+.org 0x0A
+PCINT2_INT:
+    sbi PORTB,5                    ; initialize status L to 0
+	reti
+
 .org 0x16
 rjmp	TIM1_COMPA
 
@@ -57,22 +62,9 @@ TIM0_COMPA:
 	sbi	PORTD,5
 	reti
 
-;.org 0x50
-;TIM0_COMPB:
-;	cbi	PORTD,5
-;	reti
-
 .org 0x60
 TIM1_COMPA:
-	clr	r11
-	cp	r12, r13
-	brlt	tim1_compA_ret
-	inc	r11
-	cp	r12, r14
-	brlt	tim1_compA_ret
-	inc	r11
-tim1_compA_ret:
-	clr	r12
+    ;sbi PORTB,5                    ; initialize status L to 0
 	reti
 
 ; END INTERRUPTS
@@ -81,6 +73,16 @@ tim1_compA_ret:
 ; Constants
 .equ	pwmTOP   = 99		; TOP value for PWM timer --> 20 kHz with prescaler 2
 LCD_init_routine: .db 0x33,0x32,0x28,0x01,0x0c,0x06
+
+; Setup pin change interrupt
+cbi	DDRD, 6 ; PD6 fan rpm counter input
+sbi	PORTD, 6 ; PD6 fan rpm counter, pull-up
+
+ldi tmp1, (1 << PCINT22) ; Enable PCINT22 for pcint2
+sts PCMSK2, tmp1
+ldi tmp1, (1 << PCIE2)
+sts PCICR, tmp1
+; end of pin change interrupt setup
 
 ; Display strings
 dc_str:           .db "DC = ",0x00
@@ -123,9 +125,29 @@ sbi	DDRD,5	; Set OC0A as output to enable Compare Match Output A for timer0
 cbi PORTB, 1 ; E to 0
 cbi PORTB, 0 ; RS to 0
 
+sei				; set global interrupt enable
 ldi	dutyCycle, 50 ; Init to dutycycle 50%
+
+;TESTING
+sbi DDRB,5  ; Set status L to output
+cbi PORTB,5                    ; initialize status L to 0
+
+.set delayN = 0xFFFF
+init_timer1:
+   ldi R16, high(delayN)
+   sts OCR1AH, R16
+   ldi R16, low(delayN)
+   sts OCR1AL, R16
+
+   ldi R16, (1<<OCIE1A)
+   sts TIMSK1, R16      ; Output Compare A match interrupt enable, see TIM1_COMPA
+
+   ldi R16, 0x00                    ; Configure CTC mode with clk_io/8
+   sts TCCR1A, R16
+   ldi R16, (1<<WGM12) | (1<<CS11) | (1<<CS10)  ; Start timer clk_io/8
+   sts TCCR1B, R16
+
 init_timer0:
-	sei				; set global interrupt enable
 	ldi	tmrConfig, 0b00101010	; contains settings for PWM
 setup_timer0:
 	ldi	tmrOffset, 0
@@ -374,6 +396,7 @@ send_home:
    rcall send_command
 main_display_rout:
    rcall display_upper
+   rcall display_lower
    ret
 
 display_upper:            ; Displays upper row of characters to LCD
@@ -388,6 +411,14 @@ display_upper_lcd:
    ldi letter, 0x25
    rcall display_letter   ; Display percent
    ret
+
+display_lower:
+   ldi command, 0b11000000
+   rcall send_command
+   mov letter, rpm
+   rcall display_numbers
+   ret
+display_lower_lcd:
 
 ;***************************************************************************
 ; The following subroutines define commonly used LCD commands.
