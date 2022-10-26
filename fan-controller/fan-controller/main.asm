@@ -10,14 +10,12 @@
 ; MACROS
 .listmac
 
-.macro settimer0		; use timer0 for PWM; settimer0 has 18 words and takes 21 clk
+.macro settimer0		; use timer0 for PWM; settimer0 has 14 words and takes 17 clk
 	ldi	tmrOffset, 0
-	out	TCCR0B, tmrOffset	; clear timer
-	in	tmrOffset, TIFR0	; can be removed if ISR doesn't use TOV
-	sbr	tmrOffset, 1<<TOV0	; can be removed if ISR doesn't use TOV
-	out	TIFR0, tmrOffset	; clear overflow flag; can be removed if ISR doesn't use TOV
-
-	out	TCNT0, tmrOffset	; load timer with offset; can be removed if no offset needed
+	out	TCCR0B, tmrOffset	; stop timer
+	;in	tmrOffset, TIFR0	; can be removed if ISR doesn't use TOV
+	;sbr	tmrOffset, 1<<TOV0	; can be removed if ISR doesn't use TOV
+	;out	TIFR0, tmrOffset	; clear overflow flag; can be removed if ISR doesn't use TOV
 	ldi	tmrOffset, 0b10		; 0b10 enables Compare Match A, 0b100 enables Compare Match B
 	sts	TIMSK0, tmrOffset	; enable interrupt at Compare Match A
 	ldi	tmrOffset, pwmTOP
@@ -31,21 +29,34 @@
 	pop	tmrConfig			; restore tmrConfig from stack
 	andi	tmrConfig, 0x30	; isolate COM0B(1:0)
 	ori	tmrConfig, 0b11		; add WGM0(1:0) which should always be 0b11
-
 	out	TCCR0A, tmrConfig	; further configure PWM timer
 .endmacro
 
-.macro settimer2		; use timer2 for delays; settimer2 has 12 words (sts = 2) and takes 14 clk
+.macro settimer1			; use timer1 for 0.5 sec delay; settimer1 has 16 words and takes 16 clk
+	sts	TCCR1B, tmrOffset	; stop timer
+	ldi	tmrOffset, 0b10
+	sts	TIMSK1, tmrOffset	; enable interrupt at Compare Match A
+	ldi	tmrOffset, 0x7A		; 0.5 * 16M / 256 = 31250 = 0x7A12
+	sts	OCR1AH, tmrOffset	; load Compare Match value high byte
+	ldi	tmrOffset, 0x12
+	sts	OCR1AL, tmrOffset
+	
+	ldi	tmrOffset, 0x20
+	sts	TCCR1A, tmrOffset	; configure Compare Match A and WGM mode
+	sts	TCCR1B, tmrConfig	; configure timer with prescaler
+.endmacro
+
+.macro settimer2			; use timer2 for delays; settimer2 has 12 words (sts = 2) and takes 14 clk
 	push	tmrOffset		; back up tmrOffset on stack
 	ldi	tmrOffset, 0
-	sts	0xB1, tmrOffset		; clear timer (TCCR2B is at 0xB1)
+	sts	TCCR2B, tmrOffset	; stop timer (TCCR2B is at 0xB1)
 	in	tmrOffset, TIFR2
-	sbr	tmrOffset, 1<<TOV2
+	sbr	tmrOffset, 1<<TOV2	; TOV2 is # of bit its stored at. So we shift 1 that many bytes
 	out	TIFR2, tmrOffset	; clear overflow flag
 
 	pop	tmrOffset			; restore tmrOffset from stack
-	sts	0xB2, tmrOffset		; load timer with offset (TCNT2 is at 0xB2)
-	sts	0xB1, tmrConfig		; configure timer with prescaler
+	sts	TCNT2, tmrOffset	; load timer with offset (TCNT2 is at 0xB2)
+	sts	TCCR2B, tmrConfig	; configure timer with prescaler
 .endmacro
 ; END MACROS
 
@@ -54,16 +65,40 @@
 .org 0x00
 rjmp	0x100
 
+.org 0x16
+rjmp	TIM1_COMPA
+
 .org 0x1C
 rjmp	TIM0_COMPA
+
+;.org 0x1E
+;rjmp	TIM0_COMPB
 
 .org 0x40
 TIM0_COMPA:
 	sbi	PORTD,5
 	reti
 
-.org 0x100
+;.org 0x50
+;TIM0_COMPB:
+;	cbi	PORTD,5
+;	reti
+
+.org 0x60
+TIM1_COMPA:
+	clr	r11
+	cp	r12, r13
+	brlt	tim1_compA_ret
+	inc	r11
+	cp	r12, r14
+	brlt	tim1_compA_ret
+	inc	r11
+tim1_compA_ret:
+	clr	r12
+	reti
+
 ; END INTERRUPTS
+.org 0x100
 
 ; Constants
 .equ	pwmTOP   = 99		; TOP value for PWM timer --> 20 kHz with prescaler 2
@@ -110,10 +145,18 @@ cbi PORTB, 0 ; RS to 0
 
 init_timer0:
 	sei				; set global interrupt enable
-	ldi	dutyCycle, 20
+	ldi	dutyCycle, 100
 	ldi	tmrConfig, 0b00101010	; contains settings for PWM
 	settimer0		; configure timer0 as PWM
 	; PWM should automatically operate fan
+init_timer1:
+	ldi	tmp1, 1
+	mov	r13, tmp1		; load value for checking if fan rpm < 60
+	ldi	tmp1, 40
+	mov	r14, tmp1		; load value for checking if fan rpm < 2400
+	ldi	tmrOffset, 0
+	ldi	tmrConfig, 0b11100
+	settimer1
 
 ;***************************************************************************
 ; Main initialization routine
