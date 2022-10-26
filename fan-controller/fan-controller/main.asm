@@ -118,6 +118,8 @@ fan_str:          .db "Fan: ",0x00
 .def    rpm         = r24
 .def    tmp1        = r22
 .def    tmp2        = r23
+.def    tmp3        = r27
+.def    tmp4        = r28
 .def    letter      = r25
 .def    command     = r26
 
@@ -145,7 +147,7 @@ cbi PORTB, 0 ; RS to 0
 
 init_timer0:
 	sei				; set global interrupt enable
-	ldi	dutyCycle, 100
+	ldi	dutyCycle, 10
 	ldi	tmrConfig, 0b00101010	; contains settings for PWM
 	settimer0		; configure timer0 as PWM
 	; PWM should automatically operate fan
@@ -204,12 +206,109 @@ init_lcd_loop:
 ;***************************************************************************
 main:
    rcall display_lcd
+   rcall load_input_state
+   rcall handle_input_state
    rjmp main
+
+;***************************************************************************
+; Input listeners/Debounce
+;***************************************************************************
+; initializes 4.096ms timer
+start_fourms_timer:
+   ldi tmp2, 0x00
+   sts TCCR2B, tmp2  ; stop timer 0
+   in tmp2, TIFR2
+   sbr tmp2, 1<<TOV2 ; TOV0 is # of bit its stored at. So we shift 1 that many bytes
+   out TIFR2, tmp2   ; clear overflow flag
+
+   ldi tmp2, 0
+   ldi tmp1, 0b110   ; load configuration
+   sts TCNT2, tmp2   ; load to 5ms start point
+   sts TCCR2B, tmp1  ; Load config (starts timer)
+   ret
+
+; Handles debouncing and loading of input state
+load_input_state:
+   rcall start_fourms_timer
+   ldi tmp1, 0
+   ldi tmp2, 0
+   ldi tmp3, 0
+load_input_timer_loop:
+   in inputState, pind
+   inc tmp3                     ; Keeps track of how many total times we collect data
+   sbrc inputState, 3           ; channel A
+   inc tmp2
+   sbrc inputState, 2           ; channel B
+   inc tmp1
+
+   in tmp4, TIFR2
+   sbrs tmp4, TOV2              ; Check if timer is done
+   rjmp load_input_timer_loop
+find_most_likely_bits:
+   clr debInState
+   lsr tmp3                     ; Divide register by 2. All register counts greater than half the total cycles are valid inputs
+   cp tmp1, tmp3
+   brsh set_deb_chanB
+check_chanA:
+   cp tmp2, tmp3
+   brsh set_deb_chanA
+   ret
+set_deb_chanA:
+   ori debInState, 1
+   ret
+set_deb_chanB:
+   ori debInState, 2
+   rjmp check_chanA
+
+handle_input_state:
+   andi debInState, 0b00000011
+   cpi debInState, 0b10
+   breq rpg_rotate_left
+   cpi debInState, 0b01
+   breq rpg_rotate_right
+   ret
+
+wait_for_rotate_complete:
+   rcall load_input_state
+   andi debInState, 0b00000011
+   cpi debInState, 0b11                 ; Check if debounced input is 11, aka returned to complete rotation
+   brne wait_for_rotate_complete
+   ret
+
+rpg_rotate_left:
+   rcall wait_for_rotate_complete
+   rcall dec_duty_cycle
+   ret
+
+rpg_rotate_right:
+   rcall wait_for_rotate_complete
+   rcall inc_duty_cycle
+   ret
+
+; Incrementing and Decrementing duty cycle
+dec_duty_cycle:
+   cpi inputState, 0
+   brne count_down_dc
+   ret
+count_down_dc:
+   dec dutyCycle
+   ret
+
+inc_duty_cycle:
+   cpi inputState, 100
+   brne count_up_dc
+   ret
+count_up_dc:
+   inc dutyCycle
+   ret
 
 ;***************************************************************************
 ; Commonly used timers (all utilizing timer2)
 ;***************************************************************************
 delay_5ms: ; 5 ms timer
+   rcall set_5ms
+   rjmp timer_loop
+set_5ms:
    push tmp1
    push tmp2
 
@@ -226,7 +325,7 @@ delay_5ms: ; 5 ms timer
 
    pop tmp2
    pop tmp1
-   rjmp timer_loop
+   ret
 
 delay_230ns: ; 230 ns timer
    push tmp1
@@ -252,7 +351,10 @@ timer_loop:
    rjmp timer_loop
    ret
 
-delay_100u:          ; 100us timer
+delay_100u: ; 5 ms timer
+   rcall set_100u
+   rjmp timer_loop
+set_100u:          ; 100us timer
    push tmp1
    push tmp2
 
@@ -269,7 +371,7 @@ delay_100u:          ; 100us timer
 
    pop tmp2
    pop tmp1
-   rjmp timer_loop
+   ret
 
 ;***************************************************************************
 ; The following is the main LCD display subroutine. Each step handles a
