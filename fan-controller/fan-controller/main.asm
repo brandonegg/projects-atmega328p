@@ -10,30 +10,16 @@
 ; MACROS
 .listmac
 
-.macro settimer1			; use timer1 for 0.5 sec delay; settimer1 has 16 words and takes 16 clk
-	sts	TCCR1B, tmrOffset	; stop timer
-	ldi	tmrOffset, 0b10
-	sts	TIMSK1, tmrOffset	; enable interrupt at Compare Match A
-	ldi	tmrOffset, 0x7A		; 0.5 * 16M / 256 = 31250 = 0x7A12
-	sts	OCR1AH, tmrOffset	; load Compare Match value high byte
-	ldi	tmrOffset, 0x12
-	sts	OCR1AL, tmrOffset
-	
-	ldi	tmrOffset, 0x20
-	sts	TCCR1A, tmrOffset	; configure Compare Match A and WGM mode
-	sts	TCCR1B, tmrConfig	; configure timer with prescaler
-.endmacro
-
 .macro settimer2			; use timer2 for delays; settimer2 has 12 words (sts = 2) and takes 14 clk
-	push	tmrOffset		; back up tmrOffset on stack
-	ldi	tmrOffset, 0
-	sts	TCCR2B, tmrOffset	; stop timer (TCCR2B is at 0xB1)
-	in	tmrOffset, TIFR2
-	sbr	tmrOffset, 1<<TOV2	; TOV2 is # of bit its stored at. So we shift 1 that many bytes
-	out	TIFR2, tmrOffset	; clear overflow flag
+	push	tmp1		; back up tmrOffset on stack
+	ldi	tmp1, 0
+	sts	TCCR2B, tmp1	; stop timer (TCCR2B is at 0xB1)
+	in	tmp1, TIFR2
+	sbr	tmp1, 1<<TOV2	; TOV2 is # of bit its stored at. So we shift 1 that many bytes
+	out	TIFR2, tmp1	; clear overflow flag
 
-	pop	tmrOffset			; restore tmrOffset from stack
-	sts	TCNT2, tmrOffset	; load timer with offset (TCNT2 is at 0xB2)
+	pop	tmp1			; restore tmrOffset from stack
+	sts	TCNT2, tmp1	; load timer with offset (TCNT2 is at 0xB2)
 	sts	TCCR2B, tmrConfig	; configure timer with prescaler
 .endmacro
 ; END MACROS
@@ -63,10 +49,10 @@ TIM0_COMPA:
 	reti
 
 .org 0x60
-TIM1_COMPA:
+TIM1_COMPA:               ; 16-bit timer, occurs every 0.5 seconds
     mov rpm, rpmIntCount
 	clr rpmIntCount
-	reti
+	rjmp rpm_interrupt_helper 
 
 ; END INTERRUPTS
 .org 0x100
@@ -94,7 +80,7 @@ fan_str:          .db "Fan: ",0x00
 .def	inputState  = r17    ; For storing all inputs (bits 2,1,0 = pinA, pinB, button)
 .def    debInState  = r22    ; Used ONLY to store current debounced state of pinD
 .def    tmrConfig   = r19    ; Used to set a timer's prescaler value (and PWM info if needed)
-.def    tmrOffset   = r20	 ; Used to load an 8-bit offset into a timer
+.def    lcdRefresh  = r20	 ; Used to load an 8-bit offset into a timer
 .def	dutyCycle	= r21	 ; Used to change when (in each cycle) PWM output is changed
 .def    rpmIntCount = r29
 .def    rpm         = r24
@@ -193,15 +179,16 @@ init_timer1:
 init_timer0:
 	ldi	tmrConfig, 0b00101010	; contains settings for PWM
 setup_timer0:
-	ldi	tmrOffset, 0
-	out	TCCR0B, tmrOffset	; stop timer
+    push tmp1
+	ldi	tmp1, 0
+	out	TCCR0B, tmp1	; stop timer
 	;in	tmrOffset, TIFR0	; can be removed if ISR doesn't use TOV
 	;sbr	tmrOffset, 1<<TOV0	; can be removed if ISR doesn't use TOV
 	;out	TIFR0, tmrOffset	; clear overflow flag; can be removed if ISR doesn't use TOV
-	ldi	tmrOffset, 0b10		; 0b10 enables Compare Match A, 0b100 enables Compare Match B
-	sts	TIMSK0, tmrOffset	; enable interrupt at Compare Match A
-	ldi	tmrOffset, pwmTOP
-	out	OCR0A, tmrOffset	; load TOP value for PWM timer
+	ldi	tmp1, 0b10		; 0b10 enables Compare Match A, 0b100 enables Compare Match B
+	sts	TIMSK0, tmp1	; enable interrupt at Compare Match A
+	ldi	tmp1, pwmTOP
+	out	OCR0A, tmp1	; load TOP value for PWM timer
 	
 	out	OCR0B, dutyCycle	; load Output Compare value for PWM timer
 	push	tmrConfig		; back up tmrConfig on stack
@@ -213,13 +200,23 @@ setup_timer0:
 	ori	tmrConfig, 0b11		; add WGM0(1:0) which should always be 0b11
 	out	TCCR0A, tmrConfig	; further configure PWM timer
 	; PWM should automatically operate fan
+	pop tmp1
 rjmp main
+
+rpm_interrupt_helper:
+   inc lcdRefresh
+   cpi lcdRefresh, 5
+   brlo rpm_int_return 
+   clr lcdRefresh
+   rcall display_lcd
+rpm_int_return:
+   reti
 
 ;***************************************************************************
 ; Main rotuine after initialization has occured
 ;***************************************************************************
 main:
-   rcall display_lcd
+   ;rcall display_lcd
 input_loop:
    rcall load_input_state
    rcall handle_input_state
