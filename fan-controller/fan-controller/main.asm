@@ -92,13 +92,13 @@ fan_str:          .db "Fan: ",0x00
 
 ; Register references
 .def	inputState  = r17    ; For storing all inputs (bits 2,1,0 = pinA, pinB, button)
-.def    debInState  = r18    ; Used ONLY to store current debounced state of pinD
+.def    debInState  = r22    ; Used ONLY to store current debounced state of pinD
 .def    tmrConfig   = r19    ; Used to set a timer's prescaler value (and PWM info if needed)
 .def    tmrOffset   = r20	 ; Used to load an 8-bit offset into a timer
 .def	dutyCycle	= r21	 ; Used to change when (in each cycle) PWM output is changed
 .def    rpmIntCount = r29
 .def    rpm         = r24
-.def    tmp1        = r22
+.def    tmp1        = r18
 .def    tmp2        = r23
 .def    tmp3        = r27
 .def    tmp4        = r28
@@ -472,6 +472,8 @@ send_command:              ; Generic routine to push whatever command is sitting
 ;***************************************************************************
 ; This will always display numbers with 3 digits, aka 100 shows as 100, 50 returns 50.0% and 0 displays 0.00%
 display_numbers:             ; uses value stored in letter as 'number'
+   push tmp4
+   ldi tmp4, 3               ; Used to keep track of places remaining
    rcall shift_cursor_right  ; Supports numbers of 3 digits (0-100% is all we need)
    rcall shift_cursor_right
    ldi command, 0x04         ; Change to decrement 
@@ -484,7 +486,8 @@ display_numbers_loop:
 
    mov letter, r15
    ori letter, 0x30
-
+      
+   dec tmp4
    rcall display_letter
    cpi r16, 0x0A
    brlo disp_number_return
@@ -493,7 +496,15 @@ display_numbers_loop:
 disp_number_return:
    mov letter, r16
    ori letter, 0x30
+   dec tmp4
    rcall display_letter
+add_remaining_spaces:
+   cpi tmp4, 0
+   breq undo_display_shift_mode
+   dec tmp4
+   ldi letter, 0b00100000
+   rcall display_letter
+   rjmp add_remaining_spaces
 undo_display_shift_mode:
    ldi command, 0x06            ; Change display mode 
    rcall send_command
@@ -502,6 +513,7 @@ undo_display_shift_mode:
    rcall shift_cursor_right
    rcall shift_cursor_right
    rcall set_character_mode
+   pop tmp4
    ret
 
 display_letters:            ; Uses z pointer to display letters until 0x00 is reached
