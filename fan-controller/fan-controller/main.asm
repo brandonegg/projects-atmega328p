@@ -204,8 +204,7 @@ init_lcd_loop:
 ;***************************************************************************
 main:
    rcall display_lcd
-test:
-   rjmp test
+   rjmp main
 
 ;***************************************************************************
 ; Commonly used timers (all utilizing timer2)
@@ -277,6 +276,10 @@ delay_100u:          ; 100us timer
 ; different portion of the display functionality.
 ;***************************************************************************
 display_lcd:
+send_home:
+   ldi command, 0b00000010
+   rcall send_command
+main_display_rout:
    rcall display_upper
    ret
 
