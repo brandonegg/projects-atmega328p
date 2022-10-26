@@ -10,28 +10,6 @@
 ; MACROS
 .listmac
 
-.macro settimer0		; use timer0 for PWM; settimer0 has 14 words and takes 17 clk
-	ldi	tmrOffset, 0
-	out	TCCR0B, tmrOffset	; stop timer
-	;in	tmrOffset, TIFR0	; can be removed if ISR doesn't use TOV
-	;sbr	tmrOffset, 1<<TOV0	; can be removed if ISR doesn't use TOV
-	;out	TIFR0, tmrOffset	; clear overflow flag; can be removed if ISR doesn't use TOV
-	ldi	tmrOffset, 0b10		; 0b10 enables Compare Match A, 0b100 enables Compare Match B
-	sts	TIMSK0, tmrOffset	; enable interrupt at Compare Match A
-	ldi	tmrOffset, pwmTOP
-	out	OCR0A, tmrOffset	; load TOP value for PWM timer
-	
-	out	OCR0B, dutyCycle	; load Output Compare value for PWM timer
-	push	tmrConfig		; back up tmrConfig on stack
-	andi	tmrConfig, 0x0F	; isolate WGM0(2) and CS0(2:0)
-	out	TCCR0B, tmrConfig	; configure PWM timer with prescaler
-
-	pop	tmrConfig			; restore tmrConfig from stack
-	andi	tmrConfig, 0x30	; isolate COM0B(1:0)
-	ori	tmrConfig, 0b11		; add WGM0(1:0) which should always be 0b11
-	out	TCCR0A, tmrConfig	; further configure PWM timer
-.endmacro
-
 .macro settimer1			; use timer1 for 0.5 sec delay; settimer1 has 16 words and takes 16 clk
 	sts	TCCR1B, tmrOffset	; stop timer
 	ldi	tmrOffset, 0b10
@@ -147,10 +125,30 @@ cbi PORTB, 0 ; RS to 0
 
 init_timer0:
 	sei				; set global interrupt enable
-	ldi	dutyCycle, 10
+	ldi	dutyCycle, 50
 	ldi	tmrConfig, 0b00101010	; contains settings for PWM
-	settimer0		; configure timer0 as PWM
+setup_timer0:
+	ldi	tmrOffset, 0
+	out	TCCR0B, tmrOffset	; stop timer
+	;in	tmrOffset, TIFR0	; can be removed if ISR doesn't use TOV
+	;sbr	tmrOffset, 1<<TOV0	; can be removed if ISR doesn't use TOV
+	;out	TIFR0, tmrOffset	; clear overflow flag; can be removed if ISR doesn't use TOV
+	ldi	tmrOffset, 0b10		; 0b10 enables Compare Match A, 0b100 enables Compare Match B
+	sts	TIMSK0, tmrOffset	; enable interrupt at Compare Match A
+	ldi	tmrOffset, pwmTOP
+	out	OCR0A, tmrOffset	; load TOP value for PWM timer
+	
+	out	OCR0B, dutyCycle	; load Output Compare value for PWM timer
+	push	tmrConfig		; back up tmrConfig on stack
+	andi	tmrConfig, 0x0F	; isolate WGM0(2) and CS0(2:0)
+	out	TCCR0B, tmrConfig	; configure PWM timer with prescaler
+
+	pop	tmrConfig			; restore tmrConfig from stack
+	andi	tmrConfig, 0x30	; isolate COM0B(1:0)
+	ori	tmrConfig, 0b11		; add WGM0(1:0) which should always be 0b11
+	out	TCCR0A, tmrConfig	; further configure PWM timer
 	; PWM should automatically operate fan
+
 init_timer1:
 	ldi	tmp1, 1
 	mov	r13, tmp1		; load value for checking if fan rpm < 60
