@@ -206,15 +206,16 @@ init_lcd_loop:
 ;***************************************************************************
 main:
    rcall display_lcd
+input_loop:
    rcall load_input_state
    rcall handle_input_state
-   rjmp main
+   rjmp input_loop
 
 ;***************************************************************************
 ; Input listeners/Debounce
 ;***************************************************************************
 ; initializes 4.096ms timer
-start_fourms_timer:
+start_debounce_timer:
    ldi tmp2, 0x00
    sts TCCR2B, tmp2  ; stop timer 0
    in tmp2, TIFR2
@@ -222,14 +223,14 @@ start_fourms_timer:
    out TIFR2, tmp2   ; clear overflow flag
 
    ldi tmp2, 0
-   ldi tmp1, 0b110   ; load configuration
+   ldi tmp1, 0b010   ; load configuration
    sts TCNT2, tmp2   ; load to 5ms start point
    sts TCCR2B, tmp1  ; Load config (starts timer)
    ret
 
 ; Handles debouncing and loading of input state
 load_input_state:
-   rcall start_fourms_timer
+   rcall start_debounce_timer
    ldi tmp1, 0
    ldi tmp2, 0
    ldi tmp3, 0
@@ -278,11 +279,13 @@ wait_for_rotate_complete:
 rpg_rotate_left:
    rcall wait_for_rotate_complete
    rcall dec_duty_cycle
+   rcall display_lcd
    ret
 
 rpg_rotate_right:
    rcall wait_for_rotate_complete
    rcall inc_duty_cycle
+   rcall display_lcd
    ret
 
 ; Incrementing and Decrementing duty cycle
