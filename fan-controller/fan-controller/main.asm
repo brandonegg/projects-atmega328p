@@ -134,6 +134,47 @@ ldi	dutyCycle, 50 ; Init to dutycycle 50%
 sbi DDRB,5  ; Set status L to output
 cbi PORTB,5                    ; initialize status L to 0
 
+;***************************************************************************
+; Main initialization routine
+;***************************************************************************
+; WAITING 0.1 seconds before beginning (required by LCD)
+ldi r16, 7  ; 16MHz -> .1 / (6.25E-8 * 1024 * 256) ~= 7
+
+delay_100ms:
+   ldi tmp2, 0x00
+   sts TCCR2B, tmp2  ; stop timer 0
+   in tmp2, TIFR2
+   sbr tmp2, 1<<TOV2 ; TOV0 is # of bit its stored at. So we shift 1 that many bytes
+   out TIFR2, tmp2   ; clear overflow flag
+
+   ldi tmp2, 0     ;
+   ldi tmp1, 0b101   ; load configuration
+   sts TCNT2, tmp2   ; load to 0 start point
+   sts TCCR2B, tmp1  ; Load config (starts timer)
+lcd_startup_wait:
+   in tmp2, TIFR2
+   sbrs tmp2, TOV2             ; Wait until timer done
+   rjmp lcd_startup_wait
+
+   dec r16
+   tst r16                     ; Do this 7 times
+   breq init_lcd
+   rjmp delay_100ms
+; WAITING COMPLETE, BEGIN INITIALIZING
+init_lcd:
+   rcall set_command_mode
+   ldi	ZL,LOW(2*LCD_init_routine)  ; initialize Z pointer
+   ldi	ZH,HIGH(2*LCD_init_routine)
+   ldi r16, init_nibble             ; Keep track so we know when we're done sending commands
+init_lcd_loop:
+   lpm command, Z+
+   rcall send_command
+   dec r16
+   tst r16
+   breq init_timer1
+   rjmp init_lcd_loop
+; LCD INITIALIZATION COMPLETE
+
 .set delayN = 0xFFFF
 init_timer1:
    ldi R16, high(delayN)
@@ -175,47 +216,6 @@ setup_timer0:
 rjmp main
 
 ;***************************************************************************
-; Main initialization routine
-;***************************************************************************
-; WAITING 0.1 seconds before beginning (required by LCD)
-ldi r16, 7  ; 16MHz -> .1 / (6.25E-8 * 1024 * 256) ~= 7
-
-delay_100ms:
-   ldi tmp2, 0x00
-   sts TCCR2B, tmp2  ; stop timer 0
-   in tmp2, TIFR2
-   sbr tmp2, 1<<TOV2 ; TOV0 is # of bit its stored at. So we shift 1 that many bytes
-   out TIFR2, tmp2   ; clear overflow flag
-
-   ldi tmp2, 0     ;
-   ldi tmp1, 0b101   ; load configuration
-   sts TCNT2, tmp2   ; load to 0 start point
-   sts TCCR2B, tmp1  ; Load config (starts timer)
-lcd_startup_wait:
-   in tmp2, TIFR2
-   sbrs tmp2, TOV2             ; Wait until timer done
-   rjmp lcd_startup_wait
-
-   dec r16
-   tst r16                     ; Do this 7 times
-   breq init_lcd
-   rjmp delay_100ms
-; WAITING COMPLETE, BEGIN INITIALIZING
-init_lcd:
-   rcall set_command_mode
-   ldi	ZL,LOW(2*LCD_init_routine)  ; initialize Z pointer
-   ldi	ZH,HIGH(2*LCD_init_routine)
-   ldi r16, init_nibble             ; Keep track so we know when we're done sending commands
-init_lcd_loop:
-   lpm command, Z+
-   rcall send_command
-   dec r16
-   tst r16
-   breq main
-   rjmp init_lcd_loop
-; LCD INITIALIZATION COMPLETE
-
-;***************************************************************************
 ; Main rotuine after initialization has occured
 ;***************************************************************************
 main:
@@ -223,7 +223,7 @@ main:
 input_loop:
    rcall load_input_state
    rcall handle_input_state
-   rjmp main
+   rjmp input_loop
 
 ;***************************************************************************
 ; Input listeners/Debounce
