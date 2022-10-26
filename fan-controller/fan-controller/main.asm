@@ -44,8 +44,8 @@
 rjmp	0x100
 
 .org 0x0A
-PCINT2_INT:
-    sbi PORTB,5                    ; initialize status L to 0
+PCINT2_INT:  ; Configured to be called when PD6 goes high.
+	inc rpmIntCount
 	reti
 
 .org 0x16
@@ -64,7 +64,8 @@ TIM0_COMPA:
 
 .org 0x60
 TIM1_COMPA:
-    ;sbi PORTB,5                    ; initialize status L to 0
+    mov rpm, rpmIntCount
+	clr rpmIntCount
 	reti
 
 ; END INTERRUPTS
@@ -95,6 +96,7 @@ fan_str:          .db "Fan: ",0x00
 .def    tmrConfig   = r19    ; Used to set a timer's prescaler value (and PWM info if needed)
 .def    tmrOffset   = r20	 ; Used to load an 8-bit offset into a timer
 .def	dutyCycle	= r21	 ; Used to change when (in each cycle) PWM output is changed
+.def    rpmIntCount = r29
 .def    rpm         = r24
 .def    tmp1        = r22
 .def    tmp2        = r23
@@ -221,7 +223,7 @@ main:
 input_loop:
    rcall load_input_state
    rcall handle_input_state
-   rjmp input_loop
+   rjmp main
 
 ;***************************************************************************
 ; Input listeners/Debounce
