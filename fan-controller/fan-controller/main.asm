@@ -123,9 +123,9 @@ sbi	DDRD,5	; Set OC0A as output to enable Compare Match Output A for timer0
 cbi PORTB, 1 ; E to 0
 cbi PORTB, 0 ; RS to 0
 
+ldi	dutyCycle, 50 ; Init to dutycycle 50%
 init_timer0:
 	sei				; set global interrupt enable
-	ldi	dutyCycle, 50
 	ldi	tmrConfig, 0b00101010	; contains settings for PWM
 setup_timer0:
 	ldi	tmrOffset, 0
@@ -148,15 +148,7 @@ setup_timer0:
 	ori	tmrConfig, 0b11		; add WGM0(1:0) which should always be 0b11
 	out	TCCR0A, tmrConfig	; further configure PWM timer
 	; PWM should automatically operate fan
-
-init_timer1:
-	ldi	tmp1, 1
-	mov	r13, tmp1		; load value for checking if fan rpm < 60
-	ldi	tmp1, 40
-	mov	r14, tmp1		; load value for checking if fan rpm < 2400
-	ldi	tmrOffset, 0
-	ldi	tmrConfig, 0b11100
-	settimer1
+rjmp main
 
 ;***************************************************************************
 ; Main initialization routine
@@ -277,14 +269,12 @@ wait_for_rotate_complete:
 rpg_rotate_left:
    rcall wait_for_rotate_complete
    rcall dec_duty_cycle
-   rcall display_lcd
-   ret
+   rjmp init_timer0
 
 rpg_rotate_right:
    rcall wait_for_rotate_complete
    rcall inc_duty_cycle
-   rcall display_lcd
-   ret
+   rjmp init_timer0
 
 ; Incrementing and Decrementing duty cycle
 dec_duty_cycle:
