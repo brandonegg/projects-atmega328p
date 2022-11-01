@@ -52,20 +52,21 @@ TIM0_COMPA:
 TIM1_COMPA:               ; 16-bit timer, occurs every 0.5 seconds
     mov rpm, rpmIntCount
 	clr rpmIntCount
-	rjmp rpm_interrupt_helper 
+	rjmp rpm_interrupt_helper
 
 ; END INTERRUPTS
 .org 0x100
 
 ; Constants
-.equ	pwmTOP   = 99		; TOP value for PWM timer --> 20 kHz with prescaler 2
-LCD_init_routine: .db 0x33,0x32,0x28,0x01,0x0c,0x06
+.equ	pwmTOP    = 99		; TOP value for PWM timer --> 20 kHz with prescaler 2
+.equ    rpm_delay = 0x7A12  ; 0.5s/(6.25E-8 * 256) = 31250 - 0.5 seconds for 16-second rpm timer
+LCD_init_routine: .db 0x33,0x32,0x28,0x01,0x0c,0x06 ;Initialization routine called at start of application
 
 ; Setup pin change interrupt
-cbi	DDRD, 6 ; PD6 fan rpm counter input
+cbi	DDRD, 6  ; PD6 fan rpm counter input
 sbi	PORTD, 6 ; PD6 fan rpm counter, pull-up
 
-ldi tmp1, (1 << PCINT22) ; Enable PCINT22 for pcint2
+ldi tmp1, (1 << PCINT22) ; Enable PCINT22 for pcint2 - enables 16-bit
 sts PCMSK2, tmp1
 ldi tmp1, (1 << PCIE2)
 sts PCICR, tmp1
@@ -113,12 +114,8 @@ sbi	DDRD,5	; Set OC0A as output to enable Compare Match Output A for timer0
 cbi PORTB, 1 ; E to 0
 cbi PORTB, 0 ; RS to 0
 
-sei				; set global interrupt enable
+sei				  ; set global interrupt enable
 ldi	dutyCycle, 50 ; Init to dutycycle 50%
-
-;TESTING
-sbi DDRB,5  ; Set status L to output
-cbi PORTB,5                    ; initialize status L to 0
 
 ;***************************************************************************
 ; Main initialization routine
@@ -157,24 +154,23 @@ init_lcd_loop:
    rcall send_command
    dec r16
    tst r16
-   breq init_timer1
+   breq init_rpm_timer
    rjmp init_lcd_loop
 ; LCD INITIALIZATION COMPLETE
 
-.set delayN = 0xFFFF
-init_timer1:
-   ldi R16, high(delayN)
-   sts OCR1AH, R16
-   ldi R16, low(delayN)
-   sts OCR1AL, R16
+init_rpm_timer:
+   ldi tmp1, high(rpm_delay)
+   sts OCR1AH, tmp1
+   ldi tmp1, low(rpm_delay)
+   sts OCR1AL, tmp1
 
-   ldi R16, (1<<OCIE1A)
-   sts TIMSK1, R16      ; Output Compare A match interrupt enable, see TIM1_COMPA
+   ldi tmp1, (1<<OCIE1A)
+   sts TIMSK1, tmp1                              ; Output Compare A match interrupt enable, see TIM1_COMPA
 
-   ldi R16, 0x00                    ; Configure CTC mode with clk_io/8
-   sts TCCR1A, R16
-   ldi R16, (1<<WGM12) | (1<<CS11) | (1<<CS10)  ; Start timer clk_io/8
-   sts TCCR1B, R16
+   ldi tmp1, 0x00                                ; Configure CTC mode with clk_io/8
+   sts TCCR1A, tmp1
+   ldi tmp1, (1<<WGM12) | (1<<CS12)  ; Start timer clk_io/256
+   sts TCCR1B, tmp1
 
 init_timer0:
 	ldi	tmrConfig, 0b00101010	; contains settings for PWM
@@ -203,12 +199,19 @@ setup_timer0:
 	pop tmp1
 rjmp main
 
-rpm_interrupt_helper:
-   inc lcdRefresh
+rpm_interrupt_helper:    ; Called at end of 16-bit RPM timer. Resets timer and refreshes LCD fan info
+   push tmp1
+   ldi tmp1, high(rpm_delay) ; Init 16-bit timer
+   sts OCR1AH, tmp1
+   ldi tmp1, low(rpm_delay)
+   sts OCR1AL, tmp1
+
+   inc lcdRefresh        ; Refresh 
    cpi lcdRefresh, 5
    brlo rpm_int_return 
    clr lcdRefresh
    rcall display_lcd
+   pop tmp1
 rpm_int_return:
    reti
 
