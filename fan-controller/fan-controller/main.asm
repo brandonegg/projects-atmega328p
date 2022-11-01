@@ -59,6 +59,9 @@ TIM1_COMPA:               ; 16-bit timer, occurs every 0.5 seconds
 .equ    rpm_delay = 0x7A12  ; 0.5s/(6.25E-8 * 256) = 31250 - 0.5 seconds for 16-second rpm timer
 LCD_init_routine: .db 0x33,0x32,0x28,0x01,0x0c,0x06 ;Initialization routine called at start of application
 
+; TESTING:
+sbi DDRB,5  ; Set status L to output
+
 ; Setup pin change interrupt
 cbi	DDRD, 6  ; PD6 fan rpm counter input
 sbi	PORTD, 6 ; PD6 fan rpm counter, pull-up
@@ -90,6 +93,7 @@ fan_stopped:      .db "stopped",0x00
 .def    tmp2        = r23
 .def    tmp3        = r27
 .def    tmp4        = r28
+.def    tmp5        = r19
 .def    letter      = r25
 .def    command     = r26
 
@@ -205,6 +209,7 @@ rpm_interrupt_helper:    ; Called at end of 16-bit RPM timer. Resets timer and r
    push tmp2
    push tmp3
    push tmp4
+   push tmp5
    in tmp1, SREG
    push tmp1
 
@@ -218,6 +223,7 @@ rpm_interrupt_helper:    ; Called at end of 16-bit RPM timer. Resets timer and r
 
    pop tmp1
    out SREG, tmp1
+   pop tmp5
    pop tmp4
    pop tmp3
    pop tmp2
@@ -259,44 +265,82 @@ load_input_state:
    ldi tmp1, 0
    ldi tmp2, 0
    ldi tmp3, 0
+   ldi tmp4, 0
 load_input_timer_loop:
    in inputState, pind
-   inc tmp3                     ; Keeps track of how many total times we collect data
+   inc tmp4                     ; Keeps track of how many total times we collect data
    sbrc inputState, 3           ; channel A
    inc tmp2
    sbrc inputState, 2           ; channel B
    inc tmp1
+   sbrc inputState, 4           ; push button
+   inc tmp3
 
-   in tmp4, TIFR2
-   sbrs tmp4, TOV2              ; Check if timer is done
+   in tmp5, TIFR2
+   sbrs tmp5, TOV2              ; Check if timer is done
    rjmp load_input_timer_loop
 find_most_likely_bits:
    clr debInState
-   lsr tmp3                     ; Divide register by 2. All register counts greater than half the total cycles are valid inputs
-   cp tmp1, tmp3
+   lsr tmp4                     ; Divide register by 2. All register counts greater than half the total cycles are valid inputs
+   cp tmp1, tmp4
    brsh set_deb_chanB
 check_chanA:
-   cp tmp2, tmp3
+   cp tmp2, tmp4
    brsh set_deb_chanA
+check_pshbtn:
+   cp tmp3, tmp4
+   brsh set_pshbtn
    ret
 set_deb_chanA:
+   ori debInState, 2
+   rjmp check_pshbtn
+set_deb_chanB:
+   ori debInState, 4
+   rjmp check_chanA
+set_pshbtn:
    ori debInState, 1
    ret
-set_deb_chanB:
-   ori debInState, 2
-   rjmp check_chanA
 
 handle_input_state:
-   andi debInState, 0b00000011
+   andi debInState, 0b00000111
+   sbrs debInState, 0
+   rjmp turned_off_state
+
+   lsr debInState
    cpi debInState, 0b10
    breq rpg_rotate_right
    cpi debInState, 0b01
    breq rpg_rotate_left
    ret
 
+turned_off_state:
+   rcall wait_for_release
+   sbi PORTB,5
+   ;Display DC = OFF
+turned_off_loop:
+   rcall load_input_state
+   andi debInState, 0b00000001
+   sbrs debInState, 0
+   rjmp turn_on
+
+   rjmp turned_off_loop
+turn_on:
+   rcall wait_for_release
+   cbi PORTB,5
+   rjmp init_rpm_timer
+
+wait_for_release:
+   rcall load_input_state
+   andi debInState, 0b00000001
+   sbrc debInState, 0
+   ret
+
+   rjmp wait_for_release
+
 wait_for_rotate_complete:
    rcall load_input_state
-   andi debInState, 0b00000011
+   andi debInState, 0b00000111
+   lsr debInState
    cpi debInState, 0b11                 ; Check if debounced input is 11, aka returned to complete rotation
    brne wait_for_rotate_complete
    ret
