@@ -289,9 +289,9 @@ set_deb_chanB:
 handle_input_state:
    andi debInState, 0b00000011
    cpi debInState, 0b10
-   breq rpg_rotate_left
-   cpi debInState, 0b01
    breq rpg_rotate_right
+   cpi debInState, 0b01
+   breq rpg_rotate_left
    ret
 
 wait_for_rotate_complete:
@@ -313,7 +313,7 @@ rpg_rotate_right:
 
 ; Incrementing and Decrementing duty cycle
 dec_duty_cycle:
-   cpi inputState, 0
+   cpi dutyCycle, 0
    brne count_down_dc
    ret
 count_down_dc:
@@ -321,7 +321,7 @@ count_down_dc:
    ret
 
 inc_duty_cycle:
-   cpi inputState, 100
+   cpi dutyCycle, 100
    brne count_up_dc
    ret
 count_up_dc:
