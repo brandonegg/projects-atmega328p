@@ -75,6 +75,10 @@ sts PCICR, tmp1
 ; Display strings
 dc_str:           .db "DC = ",0x00
 fan_str:          .db "Fan: ",0x00
+fan_ok:           .db "RPM OK ",0x00
+fan_low:          .db "low RPM",0x00
+fan_stopped:      .db "stopped",0x00
+
 .equ init_nibble = 6
 
 ; Register references
@@ -154,7 +158,7 @@ init_lcd_loop:
    rcall send_command
    dec r16
    tst r16
-   breq init_rpm_timer
+   breq main
    rjmp init_lcd_loop
 ; LCD INITIALIZATION COMPLETE
 
@@ -197,7 +201,7 @@ setup_timer0:
 	out	TCCR0A, tmrConfig	; further configure PWM timer
 	; PWM should automatically operate fan
 	pop tmp1
-rjmp main
+rjmp input_loop
 
 rpm_interrupt_helper:    ; Called at end of 16-bit RPM timer. Resets timer and refreshes LCD fan info
    push tmp1
@@ -205,12 +209,9 @@ rpm_interrupt_helper:    ; Called at end of 16-bit RPM timer. Resets timer and r
    sts OCR1AH, tmp1
    ldi tmp1, low(rpm_delay)
    sts OCR1AL, tmp1
-
-   inc lcdRefresh        ; Refresh 
-   cpi lcdRefresh, 5
-   brlo rpm_int_return 
-   clr lcdRefresh
-   rcall display_lcd
+   
+   rcall display_update_dc
+   rcall display_update_rpm
    pop tmp1
 rpm_int_return:
    reti
@@ -219,7 +220,8 @@ rpm_int_return:
 ; Main rotuine after initialization has occured
 ;***************************************************************************
 main:
-   ;rcall display_lcd
+   rcall display_lcd_constants
+   rjmp init_rpm_timer
 input_loop:
    rcall load_input_state
    rcall handle_input_state
@@ -392,6 +394,65 @@ set_100u:          ; 100us timer
 ; The following is the main LCD display subroutine. Each step handles a
 ; different portion of the display functionality.
 ;***************************************************************************
+display_lcd_constants:
+   rcall display_upper_const ; Displays DC = 
+   rcall display_lower_const ; Displays Fan = 
+   rcall display_update_dc   ; Sets the duty cycle
+   rcall display_update_rpm  ; Displays rpm fan status
+   ret
+
+display_upper_const:
+   ldi command, 0b00000010 ; Send cursor home
+   rcall send_command      
+
+   ldi	ZL,LOW(2*dc_str)   ; initialize Z pointer
+   ldi	ZH,HIGH(2*dc_str)  ; to upper string base
+   rcall display_letters
+   ret
+
+display_lower_const:
+   ldi command, 0b11000000 ; Send to first cell of second row
+   rcall send_command
+
+   ldi	ZL,LOW(2*fan_str)   ; initialize Z pointer
+   ldi	ZH,HIGH(2*fan_str)  ; to upper string base
+   rcall display_letters
+   ret
+
+display_update_dc:
+   ldi command, 0b10000101 ; Set address to 0x05
+   rcall send_command
+
+   mov letter, dutyCycle   ; Copy duty cycle over to letter register
+   rcall display_numbers
+   ldi letter, 0x25
+   rcall display_letter    ; Display percent
+   ret
+
+display_update_rpm:
+   ldi command, 0b11000101 ; Set address to 0x45
+   rcall send_command
+
+   cpi rpm, 40              ; 2400 rpm/60 = 40rps
+   brlo display_fan_low     ; display low rpm text
+   cpi rpm, 0
+   breq display_fan_stopped
+
+   ldi	ZL,LOW(2*fan_ok)   ; initialize Z pointer
+   ldi	ZH,HIGH(2*fan_ok)  ; to upper string base
+   rcall display_letters
+   ret
+display_fan_low:
+   ldi	ZL,LOW(2*fan_low)   ; initialize Z pointer
+   ldi	ZH,HIGH(2*fan_low)  ; to upper string base
+   rcall display_letters
+   ret
+display_fan_stopped:
+   ldi	ZL,LOW(2*fan_stopped)   ; initialize Z pointer
+   ldi	ZH,HIGH(2*fan_stopped)  ; to upper string base
+   rcall display_letters
+   ret
+
 display_lcd:
 send_home:
    ldi command, 0b00000010
@@ -400,7 +461,6 @@ main_display_rout:
    rcall display_upper
    rcall display_lower
    ret
-
 display_upper:            ; Displays upper row of characters to LCD
    ldi	ZL,LOW(2*dc_str)  ; initialize Z pointer
    ldi	ZH,HIGH(2*dc_str) ; to upper string base
