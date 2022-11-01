@@ -209,10 +209,10 @@ rpm_interrupt_helper:    ; Called at end of 16-bit RPM timer. Resets timer and r
    sts OCR1AH, tmp1
    ldi tmp1, low(rpm_delay)
    sts OCR1AL, tmp1
+   pop tmp1
    
    rcall display_update_dc
    rcall display_update_rpm
-   pop tmp1
 rpm_int_return:
    reti
 
@@ -452,35 +452,6 @@ display_fan_stopped:
    ldi	ZH,HIGH(2*fan_stopped)  ; to upper string base
    rcall display_letters
    ret
-
-display_lcd:
-send_home:
-   ldi command, 0b00000010
-   rcall send_command
-main_display_rout:
-   rcall display_upper
-   rcall display_lower
-   ret
-display_upper:            ; Displays upper row of characters to LCD
-   ldi	ZL,LOW(2*dc_str)  ; initialize Z pointer
-   ldi	ZH,HIGH(2*dc_str) ; to upper string base
-reset_cursor:
-   rcall set_command_mode
-display_upper_lcd:
-   rcall display_letters
-   mov letter, dutyCycle
-   rcall display_numbers
-   ldi letter, 0x25
-   rcall display_letter   ; Display percent
-   ret
-
-display_lower:
-   ldi command, 0b11000000
-   rcall send_command
-   mov letter, rpm
-   rcall display_numbers
-   ret
-display_lower_lcd:
 
 ;***************************************************************************
 ; The following subroutines define commonly used LCD commands.
