@@ -40,9 +40,6 @@ rjmp	TIM1_COMPA
 .org 0x1C
 rjmp	TIM0_COMPA
 
-;.org 0x1E
-;rjmp	TIM0_COMPB
-
 .org 0x40
 TIM0_COMPA:
 	sbi	PORTD,5
