@@ -164,21 +164,7 @@ init_lcd_loop:
    rjmp init_lcd_loop
 ; LCD INITIALIZATION COMPLETE
 
-init_rpm_timer:
-   ldi tmp1, high(rpm_delay)
-   sts OCR1AH, tmp1
-   ldi tmp1, low(rpm_delay)
-   sts OCR1AL, tmp1
-
-   ldi tmp1, (1<<OCIE1A)
-   sts TIMSK1, tmp1                              ; Output Compare A match interrupt enable, see TIM1_COMPA
-
-   ldi tmp1, 0x00                                ; Configure CTC mode with clk_io/256
-   sts TCCR1A, tmp1
-   ldi tmp1, (1<<WGM12) | (1<<CS12)  ; Start timer clk_io/256
-   sts TCCR1B, tmp1
-
-init_timer0:
+init_duty_cycle:
 	ldi	tmrConfig, 0b00101010	; contains settings for PWM
 setup_timer0:
     push tmp1
@@ -203,6 +189,24 @@ setup_timer0:
 	out	TCCR0A, tmrConfig	; further configure PWM timer
 	; PWM should automatically operate fan
 	pop tmp1
+	ret
+
+init_rpm_timer:
+   ldi tmp1, high(rpm_delay)
+   sts OCR1AH, tmp1
+   ldi tmp1, low(rpm_delay)
+   sts OCR1AL, tmp1
+
+   ldi tmp1, (1<<OCIE1A)
+   sts TIMSK1, tmp1                              ; Output Compare A match interrupt enable, see TIM1_COMPA
+
+   ldi tmp1, 0x00                                ; Configure CTC mode with clk_io/256
+   sts TCCR1A, tmp1
+   ldi tmp1, (1<<WGM12) | (1<<CS12)  ; Start timer clk_io/256
+   sts TCCR1B, tmp1
+
+init_timer0:
+	rcall init_duty_cycle
 rjmp input_loop
 
 rpm_interrupt_helper:    ; Called at end of 16-bit RPM timer. Resets timer and refreshes LCD fan info
@@ -318,9 +322,14 @@ turned_off_state:
    rcall wait_for_release
    ldi tmrConfig, 0
    sts TCCR1B, tmrConfig
-   out TCCR0A, tmrConfig	; further configure PWM timer
+   mov rpm, dutyCycle
+   ldi dutyCycle, 0
+   rcall init_duty_cycle
 
-   sbi PORTB,5
+   ldi command, 0b11000101 ; Set address to 0x45
+   rcall send_command
+   rcall display_fan_stopped
+
    rcall display_dc_off
 turned_off_loop:
    rcall load_input_state
@@ -331,7 +340,7 @@ turned_off_loop:
    rjmp turned_off_loop
 turn_on:
    rcall wait_for_release
-   cbi PORTB,5
+   mov dutyCycle, rpm
    rjmp init_rpm_timer
 
 wait_for_release:
