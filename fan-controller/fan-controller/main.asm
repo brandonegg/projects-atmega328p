@@ -78,6 +78,7 @@ fan_str:          .db "Fan: ",0x00
 fan_ok:           .db "RPM OK ",0x00
 fan_low:          .db "low RPM",0x00
 fan_stopped:      .db "stopped",0x00
+fan_off:          .db "OFF  ", 0x00
 
 .equ init_nibble = 6
 
@@ -172,7 +173,7 @@ init_rpm_timer:
    ldi tmp1, (1<<OCIE1A)
    sts TIMSK1, tmp1                              ; Output Compare A match interrupt enable, see TIM1_COMPA
 
-   ldi tmp1, 0x00                                ; Configure CTC mode with clk_io/8
+   ldi tmp1, 0x00                                ; Configure CTC mode with clk_io/256
    sts TCCR1A, tmp1
    ldi tmp1, (1<<WGM12) | (1<<CS12)  ; Start timer clk_io/256
    sts TCCR1B, tmp1
@@ -314,9 +315,13 @@ handle_input_state:
    ret
 
 turned_off_state:
+   ldi tmrConfig, 0
+   sts TCCR1B, tmrConfig
+   out TCCR0A, tmrConfig	; further configure PWM timer
+
    rcall wait_for_release
    sbi PORTB,5
-   ;Display DC = OFF
+   rcall display_dc_off
 turned_off_loop:
    rcall load_input_state
    andi debInState, 0b00000001
@@ -469,6 +474,15 @@ display_lower_const:
 
    ldi	ZL,LOW(2*fan_str)   ; initialize Z pointer
    ldi	ZH,HIGH(2*fan_str)  ; to upper string base
+   rcall display_letters
+   ret
+
+display_dc_off:
+   ldi command, 0b10000101 ; Set address to 0x05
+   rcall send_command
+
+   ldi	ZL,LOW(2*fan_off)   ; initialize Z pointer
+   ldi	ZH,HIGH(2*fan_off)  ; to upper string base
    rcall display_letters
    ret
 
