@@ -433,10 +433,10 @@ display_update_rpm:
    ldi command, 0b11000101 ; Set address to 0x45
    rcall send_command
 
+   tst rpm
+   breq display_fan_stopped
    cpi rpm, 40              ; 2400 rpm/60 = 40rps
    brlo display_fan_low     ; display low rpm text
-   cpi rpm, 0
-   breq display_fan_stopped
 
    ldi	ZL,LOW(2*fan_ok)   ; initialize Z pointer
    ldi	ZH,HIGH(2*fan_ok)  ; to upper string base
