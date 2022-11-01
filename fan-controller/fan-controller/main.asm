@@ -10,17 +10,17 @@
 ; MACROS
 .listmac
 
-.macro settimer2			; use timer2 for delays; settimer2 has 12 words (sts = 2) and takes 14 clk
-	push	tmp1		; back up tmrOffset on stack
+.macro settimer2		  ; use timer2 for delays; settimer2 has 12 words (sts = 2) and takes 14 clk
+	push	tmp1		  ; back up tmrOffset on stack
 	ldi	tmp1, 0
-	sts	TCCR2B, tmp1	; stop timer (TCCR2B is at 0xB1)
+	sts	TCCR2B, tmp1	  ; stop timer (TCCR2B is at 0xB1)
 	in	tmp1, TIFR2
-	sbr	tmp1, 1<<TOV2	; TOV2 is # of bit its stored at. So we shift 1 that many bytes
-	out	TIFR2, tmp1	; clear overflow flag
+	sbr	tmp1, 1<<TOV2	  ; TOV2 is # of bit its stored at. So we shift 1 that many bytes
+	out	TIFR2, tmp1	      ; clear overflow flag
 
-	pop	tmp1			; restore tmrOffset from stack
-	sts	TCNT2, tmp1	; load timer with offset (TCNT2 is at 0xB2)
-	sts	TCCR2B, tmrConfig	; configure timer with prescaler
+	pop	tmp1			  ; restore tmrOffset from stack
+	sts	TCNT2, tmp1	      ; load timer with offset (TCNT2 is at 0xB2)
+	sts	TCCR2B, tmrConfig ; configure timer with prescaler
 .endmacro
 ; END MACROS
 
@@ -30,8 +30,8 @@
 rjmp	0x100
 
 .org 0x0A
-PCINT2_INT:  ; Configured to be called when PD6 goes high.
-	inc rpmIntCount
+PCINT2_INT:         ; Configured to be called when PD6 goes high.
+	inc rpmIntCount ; Incremeneted each time PD6 triggers
 	reti
 
 .org 0x16
@@ -42,31 +42,28 @@ rjmp	TIM0_COMPA
 
 .org 0x40
 TIM0_COMPA:
-	sbi	PORTD,5
+	sbi	PORTD,5 ; Wave generator for DC
 	reti
 
 .org 0x60
-TIM1_COMPA:               ; 16-bit timer, occurs every 0.5 seconds
-    mov rpm, rpmIntCount
-	clr rpmIntCount
+TIM1_COMPA:                   ; 16-bit timer, occurs every 0.5 seconds
+    mov rpm, rpmIntCount      ; Store rps count
+	clr rpmIntCount           ; clear to begin counting again
 	rjmp rpm_interrupt_helper
 
 ; END INTERRUPTS
 .org 0x100
 
 ; Constants
-.equ	pwmTOP    = 99		; TOP value for PWM timer --> 20 kHz with prescaler 2
-.equ    rpm_delay = 0x7A12  ; 0.5s/(6.25E-8 * 256) = 31250 - 0.5 seconds for 16-second rpm timer
-LCD_init_routine: .db 0x33,0x32,0x28,0x01,0x0c,0x06 ;Initialization routine called at start of application
-
-; TESTING:
-sbi DDRB,5  ; Set status L to output
+.equ	pwmTOP    = 99		                        ; TOP value for PWM timer --> 20 kHz with prescaler 2
+.equ    rpm_delay = 0x7A12                          ; 0.5s/(6.25E-8 * 256) = 31250 - 0.5 seconds for 16-second rpm timer
+LCD_init_routine: .db 0x33,0x32,0x28,0x01,0x0c,0x06 ; Initialization routine called at start of application
 
 ; Setup pin change interrupt
 cbi	DDRD, 6  ; PD6 fan rpm counter input
 sbi	PORTD, 6 ; PD6 fan rpm counter, pull-up
 
-ldi tmp1, (1 << PCINT22) ; Enable PCINT22 for pcint2 - enables 16-bit
+ldi tmp1, (1 << PCINT22) ; Enable PCINT22 for pcint2
 sts PCMSK2, tmp1
 ldi tmp1, (1 << PCIE2)
 sts PCICR, tmp1
@@ -88,15 +85,15 @@ fan_off:          .db "OFF  ", 0x00
 .def    tmrConfig   = r19    ; Used to set a timer's prescaler value (and PWM info if needed)
 .def    lcdRefresh  = r20	 ; Used to load an 8-bit offset into a timer
 .def	dutyCycle	= r21	 ; Used to change when (in each cycle) PWM output is changed
-.def    rpmIntCount = r29
-.def    rpm         = r24
-.def    tmp1        = r18
+.def    rpmIntCount = r29    ; Keeps track of number of rotations detected in 0.5 second interval (this value is twice the actual value explaining the 0.5 second interval equating to 1 second)
+.def    rpm         = r24    ; stores rotations per second
+.def    tmp1        = r18    ; temporary registers. Should be push/pop if you are going to use in routine
 .def    tmp2        = r23
 .def    tmp3        = r27
 .def    tmp4        = r28
 .def    tmp5        = r19
-.def    letter      = r25
-.def    command     = r26
+.def    letter      = r25    ; Stores letter for display_letter routine
+.def    command     = r26    ; Stores command for send_command routine
 
 ; INPUTS
 cbi	DDRD,2  ; PD2 is input (for B of RPG)
@@ -131,22 +128,22 @@ ldi r16, 7  ; 16MHz -> .1 / (6.25E-8 * 1024 * 256) ~= 7
 
 delay_100ms:
    ldi tmp2, 0x00
-   sts TCCR2B, tmp2  ; stop timer 0
+   sts TCCR2B, tmp2      ; stop timer 0
    in tmp2, TIFR2
-   sbr tmp2, 1<<TOV2 ; TOV0 is # of bit its stored at. So we shift 1 that many bytes
-   out TIFR2, tmp2   ; clear overflow flag
+   sbr tmp2, 1<<TOV2     ; TOV0 is # of bit its stored at. So we shift 1 that many bytes
+   out TIFR2, tmp2       ; clear overflow flag
 
-   ldi tmp2, 0     ;
-   ldi tmp1, 0b101   ; load configuration
-   sts TCNT2, tmp2   ; load to 0 start point
-   sts TCCR2B, tmp1  ; Load config (starts timer)
+   ldi tmp2, 0 
+   ldi tmp1, 0b101       ; load configuration
+   sts TCNT2, tmp2       ; load to 0 start point
+   sts TCCR2B, tmp1      ; Load config (starts timer)
 lcd_startup_wait:
    in tmp2, TIFR2
-   sbrs tmp2, TOV2             ; Wait until timer done
-   rjmp lcd_startup_wait
+   sbrs tmp2, TOV2       ; Wait until timer done
+   rjmp lcd_startup_wait ; required when sending startup commands
 
    dec r16
-   tst r16                     ; Do this 7 times
+   tst r16               ; Do this 7 times
    breq init_lcd
    rjmp delay_100ms
 ; WAITING COMPLETE, BEGIN INITIALIZING
@@ -156,11 +153,11 @@ init_lcd:
    ldi	ZH,HIGH(2*LCD_init_routine)
    ldi r16, init_nibble             ; Keep track so we know when we're done sending commands
 init_lcd_loop:
-   lpm command, Z+
+   lpm command, Z+      ; Load command
    rcall send_command
-   dec r16
+   dec r16              ; keep track of commands remaining
    tst r16
-   breq main
+   breq main            ; Once done sending commands, move to main routine
    rjmp init_lcd_loop
 ; LCD INITIALIZATION COMPLETE
 
@@ -192,25 +189,25 @@ setup_timer0:
 	ret
 
 init_rpm_timer:
-   ldi tmp1, high(rpm_delay)
+   ldi tmp1, high(rpm_delay)        ; Loads the 0.5 second value into the cutoff point of 16-bit timer
    sts OCR1AH, tmp1
    ldi tmp1, low(rpm_delay)
    sts OCR1AL, tmp1
 
    ldi tmp1, (1<<OCIE1A)
-   sts TIMSK1, tmp1                              ; Output Compare A match interrupt enable, see TIM1_COMPA
+   sts TIMSK1, tmp1                 ; Output Compare A match interrupt enable, see TIM1_COMPA
 
-   ldi tmp1, 0x00                                ; Configure CTC mode with clk_io/256
+   ldi tmp1, 0x00                   ; Configure CTC mode
    sts TCCR1A, tmp1
-   ldi tmp1, (1<<WGM12) | (1<<CS12)  ; Start timer clk_io/256
+   ldi tmp1, (1<<WGM12) | (1<<CS12) ; Start timer clk_io/256
    sts TCCR1B, tmp1
 
 init_timer0:
 	rcall init_duty_cycle
 rjmp input_loop
 
-rpm_interrupt_helper:    ; Called at end of 16-bit RPM timer. Resets timer and refreshes LCD fan info
-   push tmp1
+rpm_interrupt_helper:       ; Called at end of 16-bit RPM timer. Resets timer and refreshes LCD fan info
+   push tmp1                ; Registers could be in use during time of interrupt
    push tmp2
    push tmp3
    push tmp4
@@ -226,7 +223,7 @@ rpm_interrupt_helper:    ; Called at end of 16-bit RPM timer. Resets timer and r
    rcall display_update_dc
    rcall display_update_rpm
 
-   pop tmp1
+   pop tmp1                  ; Return registers state
    out SREG, tmp1
    pop tmp5
    pop tmp4
@@ -240,11 +237,11 @@ rpm_int_return:
 ; Main rotuine after initialization has occured
 ;***************************************************************************
 main:
-   rcall display_lcd_constants
-   rjmp init_rpm_timer
+   rcall display_lcd_constants ; Displays constant text (DC =, Fan:)
+   rjmp init_rpm_timer         ; Initializes rpm timer and PWM
 input_loop:
-   rcall load_input_state
-   rcall handle_input_state
+   rcall load_input_state      ; Load debState
+   rcall handle_input_state    ; handle debState
    rjmp input_loop
 
 ;***************************************************************************
@@ -297,21 +294,21 @@ check_pshbtn:
    brsh set_pshbtn
    ret
 set_deb_chanA:
-   ori debInState, 2
+   ori debInState, 2 ; Set debounced channel A input high
    rjmp check_pshbtn
 set_deb_chanB:
-   ori debInState, 4
+   ori debInState, 4 ; Set debounced channel B input high
    rjmp check_chanA
 set_pshbtn:
-   ori debInState, 1
+   ori debInState, 1 ; Set debounce push button high
    ret
 
 handle_input_state:
    andi debInState, 0b00000111
-   sbrs debInState, 0
-   rjmp turned_off_state
+   sbrs debInState, 0          
+   rjmp turned_off_state       ; If push btn is pressed, handle turn off state
 
-   lsr debInState
+   lsr debInState              ; shift so channel A is bit 0, and channel B is bit 1, removes push btn
    cpi debInState, 0b10
    breq rpg_rotate_right
    cpi debInState, 0b01
@@ -319,59 +316,59 @@ handle_input_state:
    ret
 
 turned_off_state:
-   rcall wait_for_release
-   ldi tmrConfig, 0
-   sts TCCR1B, tmrConfig
-   mov rpm, dutyCycle
-   ldi dutyCycle, 0
+   rcall wait_for_release ; Wait for button to be released
+   ldi tmrConfig, 0       ; Uses tmrCOnfig as we know the register wont be in use at this point
+   sts TCCR1B, tmrConfig  ; Stop rpm 16-bit timer
+   mov rpm, dutyCycle     ; save previous duty cycle to rpm (since we know it wont be in use)
+   ldi dutyCycle, 0       ; set duty cycle to 0 (fan off)
    rcall init_duty_cycle
 
-   ldi command, 0b11000101 ; Set address to 0x45
-   rcall send_command
-   rcall display_fan_stopped
+   ldi command, 0b11000101   ; Set address to 0x45
+   rcall send_command        ;
+   rcall display_fan_stopped ; Display fan stopped
 
-   rcall display_dc_off
+   rcall display_dc_off      ; Display that DC = OFF
 turned_off_loop:
    rcall load_input_state
    andi debInState, 0b00000001
-   sbrs debInState, 0
-   rjmp turn_on
+   sbrs debInState, 0          ; Check if push btn pressed
+   rjmp turn_on                ; If pushed, turn on state
 
    rjmp turned_off_loop
 turn_on:
-   rcall wait_for_release
-   mov dutyCycle, rpm
-   rjmp init_rpm_timer
+   rcall wait_for_release ; Wait for button release
+   mov dutyCycle, rpm     ; Restore the state of duty cycle before turn off
+   rjmp init_rpm_timer    ; re-initialize
 
 wait_for_release:
-   rcall load_input_state
+   rcall load_input_state      ; Loads debState
    andi debInState, 0b00000001
-   sbrc debInState, 0
+   sbrc debInState, 0          ; Release means push button io set
    ret
 
-   rjmp wait_for_release
+   rjmp wait_for_release       ; repeat until released
 
 wait_for_rotate_complete:
    rcall load_input_state
    andi debInState, 0b00000111
-   lsr debInState
-   cpi debInState, 0b11                 ; Check if debounced input is 11, aka returned to complete rotation
+   lsr debInState                 ; Remove push btn bit
+   cpi debInState, 0b11           ; Check if debounced input is 11, aka returned to complete rotation
    brne wait_for_rotate_complete
    ret
 
 rpg_rotate_left:
-   rcall wait_for_rotate_complete
+   rcall wait_for_rotate_complete ; Wait for rotation to finish
    rcall dec_duty_cycle
-   rjmp init_timer0
+   rjmp init_timer0               ; After updating duty cycle, need to reinitialize pwm
 
 rpg_rotate_right:
    rcall wait_for_rotate_complete
    rcall inc_duty_cycle
-   rjmp init_timer0
+   rjmp init_timer0               ; After updating duty cycle, need to reinitialize pwm
 
 ; Incrementing and Decrementing duty cycle
 dec_duty_cycle:
-   cpi dutyCycle, 0
+   cpi dutyCycle, 0   ; Prevent dc from decreasing if already at min (0)
    brne count_down_dc
    ret
 count_down_dc:
@@ -379,7 +376,7 @@ count_down_dc:
    ret
 
 inc_duty_cycle:
-   cpi dutyCycle, 100
+   cpi dutyCycle, 100 ; Prevent dc from increasing if already at max (100)
    brne count_up_dc
    ret
 count_up_dc:
@@ -532,13 +529,13 @@ display_fan_stopped:
 ;***************************************************************************
 ; The following subroutines define commonly used LCD commands.
 ;***************************************************************************
-pulse_e:             ; Pulses E of LCD
+pulse_e:             ; Pulses E of LCD, needed when sending data
    sbi PORTB, 1
    rcall delay_230ns ; Requires 230ns wait between high/low
    cbi PORTB, 1
    ret
 
-set_character_mode:
+set_character_mode:  ; Sets LCD to character entry mode
    sbi PORTB, 0
    ret
 
@@ -546,22 +543,22 @@ set_command_mode: ; Sets LCD to command mode (RS bit cleared)
    cbi PORTB, 0
    ret
 
-shift_cursor_right:
+shift_cursor_right:        ; Shifts LCD cursor to the right
    ldi command, 0b00010100
    rcall send_command
    ret
 
-send_command:              ; Generic routine to push whatever command is sitting in command register to LCD
+send_command:               ; Generic routine to push whatever command is sitting in command register to LCD
    rcall set_command_mode
-   swap command
+   swap command             ; Send high byte first
    out PORTC, command
    rcall pulse_e
    rcall delay_5ms
-   swap command
+   swap command             ; Send low byte
    out PORTC, command
    rcall pulse_e
    rcall delay_5ms
-   rcall set_character_mode
+   rcall set_character_mode ; Return to character mode, don't interfere with flow of other subroutine
    ret
 
 ;***************************************************************************
@@ -592,20 +589,20 @@ display_numbers_loop:
    rcall div8u
 
    mov letter, r15
-   ori letter, 0x30
+   ori letter, 0x30          ; 0x3 = 0b0011 which is the high byte of the number character row for LCD
       
-   dec tmp4
+   dec tmp4                  ; Keep track of digits displayed
    rcall display_letter
-   cpi r16, 0x0A
+   cpi r16, 0x0A             ; If remainder < 10, we can just display that value
    brlo disp_number_return
-   mov letter, r16
+   mov letter, r16           ; set next value to compute as remainder
    rjmp display_numbers_loop
-disp_number_return:
+disp_number_return:          ; displays remainder when < 10
    mov letter, r16
    ori letter, 0x30
    dec tmp4
    rcall display_letter
-add_remaining_spaces:
+add_remaining_spaces:           ; Fill spaces with " " to make sure it overwrites previously written characters even number is smaller than prev.
    cpi tmp4, 0
    breq undo_display_shift_mode
    dec tmp4
@@ -613,10 +610,10 @@ add_remaining_spaces:
    rcall display_letter
    rjmp add_remaining_spaces
 undo_display_shift_mode:
-   ldi command, 0x06            ; Change display mode 
+   ldi command, 0x06         ; Change display mode 
    rcall send_command
    rcall shift_cursor_right  ; Supports numbers of 3 digits (0-100% is all we need)
-   rcall shift_cursor_right
+   rcall shift_cursor_right  ; Shift back to expected location since we were inputting characters in reverse mode
    rcall shift_cursor_right
    rcall shift_cursor_right
    rcall set_character_mode
