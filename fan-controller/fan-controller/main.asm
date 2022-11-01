@@ -315,11 +315,11 @@ handle_input_state:
    ret
 
 turned_off_state:
+   rcall wait_for_release
    ldi tmrConfig, 0
    sts TCCR1B, tmrConfig
    out TCCR0A, tmrConfig	; further configure PWM timer
 
-   rcall wait_for_release
    sbi PORTB,5
    rcall display_dc_off
 turned_off_loop:
