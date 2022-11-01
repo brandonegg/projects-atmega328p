@@ -201,15 +201,19 @@ setup_timer0:
 rjmp input_loop
 
 rpm_interrupt_helper:    ; Called at end of 16-bit RPM timer. Resets timer and refreshes LCD fan info
-   push tmp1
    ldi tmp1, high(rpm_delay) ; Init 16-bit timer
    sts OCR1AH, tmp1
    ldi tmp1, low(rpm_delay)
    sts OCR1AL, tmp1
-   pop tmp1
    
+   in tmp1, SREG
+   push tmp1
+
    rcall display_update_dc
    rcall display_update_rpm
+
+   pop tmp1
+   out SREG, tmp1
 rpm_int_return:
    reti
 
