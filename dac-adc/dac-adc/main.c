@@ -43,6 +43,21 @@ void UART_puts(char* s)
 	while(*s > 0) UART_putc(*s++); // transmit character until NULL is reached
 }
 
+void UART_puthex8(uint8_t val)
+{
+	// extract upper and lower nibbles from input value
+	uint8_t upperNibble = (val & 0xF0) >> 4;
+	uint8_t lowerNibble = val & 0x0F;
+
+	// convert nibble to its ASCII hex equivalent
+	upperNibble += upperNibble > 9 ? 'A' - 10 : '0';
+	lowerNibble += lowerNibble > 9 ? 'A' - 10 : '0';
+
+	// print the characters
+	UART_putc(upperNibble);
+	UART_putc(lowerNibble);
+}
+
 char UART_getc(void)
 {
 	while(!(UCSR0A & (1 << RXC0))); // wait for data
@@ -75,10 +90,25 @@ void UART_getLine(char* buf, uint8_t n)
 
 // END OF I2C
 
+// BEGIN ADC
+void start_adc_meas() {
+	ADCSRA |= (1<<ADEN)  | (1<<ADSC);      // Enable ADC and Start the conversion
+	while( !(ADCSRA & (1<<ADIF)) );       // Wait for conversion to finish
+	ADCSRA |= (1<<ADIF);   // Clear ADIF,ADIF is cleared by writing a 1 to ADSCRA
+}
+// END ADC
+
+#define ADC_Channel_0   0b00000000 // ADC0 Channel
 int main(void)
 {
+	uint16_t ADC_10bit_Result = 0;
 	unsigned int ubrr = BAUD_RATE_230400_BPS;
-	char data[] = "Hello from ATmega328p  ";
+	char data[] = "Hello from ATmega428p  ";
+	
+	ADCSRA |= (1<<ADPS2) | (1<<ADPS1) | (1<<ADPS0);// Select ADC Prescalar to 128,
+	// 11.0598MHz/128 = 85KHz
+	ADMUX = ADMUX & 0xF0;           //Clear MUX0-MUX3,Important in Multichannel conv
+	ADMUX|= ADC_Channel_0;         // Select the ADC channel to convert,Aref pin tied to 5V
 	
 	UART_init(ubrr);
 	
@@ -88,7 +118,12 @@ int main(void)
 		UART_getLine(buf, 1);
 		if (buf[0] == 'G') 
 		{
+			start_adc_meas();
+			
+			ADC_10bit_Result   =  ADC;
 			UART_puts(data);
+			unsigned char lower = (ADC_10bit_Result & 0xFF);
+			UART_puthex8(ADCL);
 		}
 	}
 }
