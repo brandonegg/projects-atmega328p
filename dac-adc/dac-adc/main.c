@@ -98,33 +98,50 @@ void start_adc_meas() {
 }
 // END ADC
 
+void InitADC()
+{
+	// Select Vref=AVcc
+	ADMUX |= (1<<REFS0);
+	//set prescaller to 128 and enable ADC
+	ADCSRA |= (1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0)|(1<<ADEN);
+}
+
+void ReadADC(uint8_t ADCchannel)
+{
+	//select ADC channel with safety mask
+	ADMUX = (ADMUX & 0xF0) | (ADCchannel & 0x0F);
+	//single conversion mode
+	ADCSRA |= (1<<ADSC);
+	// wait until ADC conversion is complete
+	while( ADCSRA & (1<<ADSC) );
+	//return ADCL;
+}
+
 #define ADC_Channel_0   0b00000000 // ADC0 Channel
 int main(void)
 {
-	uint16_t ADC_10bit_Result = 0;
 	unsigned int ubrr = BAUD_RATE_230400_BPS;
-	char data[] = "Hello from ATmega428p  ";
-	
-	ADCSRA |= (1<<ADPS2) | (1<<ADPS1) | (1<<ADPS0);// Select ADC Prescalar to 128,
-	// 11.0598MHz/128 = 85KHz
-	ADMUX = ADMUX & 0xF0;           //Clear MUX0-MUX3,Important in Multichannel conv
-	ADMUX|= ADC_Channel_0;         // Select the ADC channel to convert,Aref pin tied to 5V
-	
 	UART_init(ubrr);
+	
+	InitADC();
+	
+	uint8_t lowADC;
+	uint8_t highADC;
 	
 	while(1)
 	{
-		char buf[8]; //arbitrary size of 1 register for now
-		UART_getLine(buf, 1);
-		if (buf[0] == 'G') 
-		{
-			start_adc_meas();
-			
-			ADC_10bit_Result   =  ADC;
-			UART_puts(data);
-			unsigned char lower = (ADC_10bit_Result & 0xFF);
-			UART_puthex8(ADCL);
-		}
+		ReadADC(0);
+		lowADC = ADCL; // For some reason you HAVE to read ADCL then ADCH otherwise the registers won't update next time around..
+		highADC = ADCH;
+		UART_puthex8(highADC);
+		UART_puthex8(lowADC);
+		UART_putc(' ');
+		
+		ADCL = 0;
+		ADCH = 0;
+		
+		
+		_delay_ms(500);
 	}
 }
 
