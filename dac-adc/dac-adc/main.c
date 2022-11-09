@@ -20,6 +20,8 @@
    The following are utilities for handling RS232 serial communication. Many of these functions
    are modifications from the following guide:
    http://www.rjhcoding.com/avrc-uart.php
+   Also see:
+   https://www.xanthium.in/how-to-avr-atmega328p-microcontroller-usart-uart-embedded-programming-avrgcc
  */
 void UART_init(uint16_t ubrr)
 {
@@ -40,8 +42,38 @@ void UART_puts(char* s)
 {
 	while(*s > 0) UART_putc(*s++); // transmit character until NULL is reached
 }
+
+char UART_getc(void)
+{
+	while(!(UCSR0A & (1 << RXC0))); // wait for data
+	return UDR0; // return data
+}
+
+void UART_getLine(char* buf, uint8_t n)
+{
+	uint8_t bufIdx = 0;
+	char c;
+
+	// while received character is not carriage return
+	// and end of buffer has not been reached
+	do
+	{
+		// receive character
+		c = UART_getc();
+
+		// store character in buffer
+		buf[bufIdx++] = c;
+	}
+	while((bufIdx < n) && (c != '\r'));
+
+	// ensure buffer is null terminated
+	buf[bufIdx] = 0;
+}
 // END OF UART
 
+// BEGIN I2C
+
+// END OF I2C
 
 int main(void)
 {
@@ -52,7 +84,12 @@ int main(void)
 	
 	while(1)
 	{
-		UART_puts(data);
+		char buf[8]; //arbitrary size of 1 register for now
+		UART_getLine(buf, 1);
+		if (buf[0] == 'G') 
+		{
+			UART_puts(data);
+		}
 	}
 }
 
