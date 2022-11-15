@@ -106,7 +106,7 @@ void read_adc(uint8_t ADCchannel)
 }
 
 void adc_to_voltage(uint16_t* adcMeas, float* result) {
-	*result = 5; // 5v = 1023 - 0 (10bit).
+	*result = (*adcMeas/1023.0f)*5.0f; // 5v = 1023 - 0 (10bit ADC).
 }
 
 void output_adc_meas() {
@@ -121,10 +121,10 @@ void output_adc_meas() {
 	adc_to_voltage(&ADC_10bit_Result, &voltage);
 
 	char out[4];
-	sprintf(out, "v=%f", voltage);
+	sprintf(out, "v=%.2f", voltage);
 	
 	UART_puts(out);
-	UART_puts(" V");
+	UART_puts(" V\n");
 }
 
 // COMMANDS
