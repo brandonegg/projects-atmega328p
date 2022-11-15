@@ -238,6 +238,15 @@ void handle_input() {
 	} else if (command[0] == 'M') {
 		int argBuff[2];
 		read_int_args(&command[2], argBuff, 2); // command[2] since we don't want to include the start command M,
+		if (argBuff[0] < 2 || argBuff[0] > 20) {
+			UART_puts("ERROR: Your sample argument must be 2<=n<=20\n");
+			return;
+		}
+		if (argBuff[1] < 1 || argBuff[1] > 10) {
+			UART_puts("ERROR: Your dt argument must be 1<=n<=10\n");
+			return;
+		}
+		
 		sample_multiple_adc_meas(argBuff[0], argBuff[1]);
 	} else if (command[0] == 'S') {
 		int channelArg[1];
