@@ -131,37 +131,32 @@ void output_adc_meas() {
 uint8_t atou8(const char *s)
 {
 	uint8_t v = 0;
-	while (*s) { v = (v << 1) + (v << 3) + (*(s++) - '0'); }
+	while (*s && *s != '\n') { v = (v << 1) + (v << 3) + (*(s++) - '0'); }
 	return v;
 }
 
-void read_args(int* args, int size) {
-	uint8_t maxBuffSize = 8;
-	char c[1];
-	char argBuff[maxBuffSize];
-	char tempBuff[maxBuffSize];
+void read_args(char* buffer, int* args, int size) {
+	char tempBuff[7];
 	uint8_t strIndex = 0;
 	uint8_t argIndex = 0;
 	uint8_t tempIndex;
 	uint8_t val;
-	UART_getLine(c, 1);
-	
-	while (c[0] != '\n' && strIndex < maxBuffSize) {
-		argBuff[strIndex++] = c[0];
-		UART_getLine(c, 1);
-	}
 	
 	argIndex = 0;
 	strIndex = 0;
 	while (argIndex < size) {
 		tempIndex = 0;
-		while (strIndex < maxBuffSize && argBuff[strIndex] != ',') {
-			tempBuff[tempIndex++] = argBuff[strIndex];
+		while (strIndex < 7 && buffer[strIndex] != ',') {
+			tempBuff[tempIndex++] = buffer[strIndex];
 			strIndex++;
+		}
+		while (tempIndex < 7) {
+			tempBuff[tempIndex++] = '\n';
 		}
 		
 		val = atou8(tempBuff);
 		args[argIndex++] = val;
+		strIndex++; // skip the comma
 	}
 }
 
@@ -187,7 +182,7 @@ void handle_input() {
 		output_adc_meas();
 	} else if (command[0] == 'M') {
 		int argBuff[2];
-		read_args(argBuff, 2);
+		read_args(&command[1], argBuff, 2); // command[1] since we don't want to include the start command M
 		
 	    char out[10] = "";
 		sprintf(out, "arg 1 = %d, arg 2 = %d\n", argBuff[0], argBuff[1]);
