@@ -27,9 +27,12 @@
    The following are utilities for handling RS232 serial communication. Many of these functions
    are modifications from the following guide:
    http://www.rjhcoding.com/avrc-uart.php
-   Also see:
-   https://www.xanthium.in/how-to-avr-atmega328p-microcontroller-usart-uart-embedded-programming-avrgcc
  */
+
+/************************************************************************/
+/* Initializes UART                                                     */
+/* - uint16_t ubrr: BAUD conversion                                     */
+/************************************************************************/
 void UART_init(uint16_t ubrr)
 {
 	UBRR0L = (uint8_t)(ubrr & 0xFF); // set baudrate in UBRR
@@ -39,17 +42,29 @@ void UART_init(uint16_t ubrr)
 	UCSR0C = 0x06;
 }
 
+/************************************************************************/
+/* Sends character over UART                                            */
+/* - unsigned char ubrr: Char to send                                   */
+/************************************************************************/
 void UART_putc(unsigned char data)
 {
 	while(!(UCSR0A & (1<<UDRE0))); // wait for transmit buffer to be empty
 	UDR0 = data; // load data into transmit register
 }
 
+/************************************************************************/
+/* Puts multiple char over UART                                         */
+/* - char* s: Array of characters to send                               */
+/************************************************************************/
 void UART_puts(char* s)
 {
 	while(*s > 0) UART_putc(*s++); // transmit character until NULL is reached
 }
 
+/************************************************************************/
+/* Sends 8 bit number over UART                                         */
+/* - uint8_t val: value to send                                         */
+/************************************************************************/
 void UART_puthex8(uint8_t val)
 {
 	// extract upper and lower nibbles from input value
@@ -65,12 +80,20 @@ void UART_puthex8(uint8_t val)
 	UART_putc(lowerNibble);
 }
 
+/************************************************************************/
+/* Receives character sent over UART                                    */
+/************************************************************************/
 char UART_getc(void)
 {
 	while(!(UCSR0A & (1 << RXC0))); // wait for data
 	return UDR0; // return data
 }
 
+/************************************************************************/
+/* Receives line of characters (ended by carriage return)               */
+/* - char* buf: buffer to store line                                    */
+/* - uint8_t n: size of buffer                                          */
+/************************************************************************/
 void UART_getLine(char* buf, uint8_t n)
 {
 	uint8_t bufIdx = 0;
@@ -80,24 +103,28 @@ void UART_getLine(char* buf, uint8_t n)
 	// and end of buffer has not been reached
 	do
 	{
-		// receive character
-		c = UART_getc();
-
-		// store character in buffer
-		buf[bufIdx++] = c;
+		c = UART_getc(); // receive character
+		buf[bufIdx++] = c; // store character in buffer
 	}
 	while((bufIdx < n) && (c != '\r'));
 
-	// ensure buffer is null terminated
-	buf[bufIdx] = 0;
+	buf[bufIdx] = 0; // ensure buffer is null terminated
 }
 
 // BEGIN ADC
+
+/************************************************************************/
+/* Intitializes ADC on atmega328p. Set Vref to Vcc                      */
+/************************************************************************/
 void init_adc() {
 	ADMUX |= (1<<REFS0); // Select Vref=AVcc
-	ADCSRA |= (1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0)|(1<<ADEN); //set prescaller to 128 and enable ADC
+	ADCSRA |= (1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0)|(1<<ADEN); //set pre-scalar to 128 and enable ADC
 }
 
+/************************************************************************/
+/* reads ADC value. Triggers a single conversion                        */
+/* - uint8_t ADCchannel: channel of ADC                                 */
+/************************************************************************/
 void read_adc(uint8_t ADCchannel)
 {
 	ADMUX = (ADMUX & 0xF0) | (ADCchannel & 0x0F); //select ADC channel with safety mask
@@ -105,10 +132,18 @@ void read_adc(uint8_t ADCchannel)
 	while( ADCSRA & (1<<ADSC) ); // wait until ADC conversion is complete
 }
 
+/************************************************************************/
+/* Converts ADC value (10-bit) to float value (voltage)                 */
+/* - uint16_t* adcMeas: ref to adc measurement (10-bit)                 */
+/* - float* result: ref to where float value should be stored           */
+/************************************************************************/
 void adc_to_voltage(uint16_t* adcMeas, float* result) {
 	*result = (*adcMeas/1023.0f)*5.0f; // 5v = 1023 - 0 (10bit ADC).
 }
 
+/************************************************************************/
+/* Reads ADC value, converts to float, then outputs value over serial.  */
+/************************************************************************/
 void output_adc_meas() {
 	read_adc(ADC_CHANNEL_0);
 	
@@ -127,6 +162,12 @@ void output_adc_meas() {
 	UART_puts(" V\n");
 }
 
+/************************************************************************/
+/* Calls output_adc_meas() amount # of times, with delay (seconds)      */
+/* between each call.                                                   */
+/* - int amount: # of adc samples outputted                             */
+/* - int delay: delay between sample in seconds                         */
+/************************************************************************/
 void sample_multiple_adc_meas(int amount, int delay) {
 	uint8_t counter = 0;
 	char out[10];
@@ -144,8 +185,13 @@ void sample_multiple_adc_meas(int amount, int delay) {
 }
 
 // I2C
-#define DAC_ADDRESS 0b01011000 // See data sheet, AD1 and AD0 are low which correlate to bits 1,2 of the DAC_ADDRESS BYTE
+#define DAC_ADDRESS 0b01011000 // See MAX data sheet, AD1 and AD0 are low which correlate to bits 1,2 of the DAC_ADDRESS BYTE
 
+/************************************************************************/
+/* Sends I2C command to DAC that sets output channel and output voltage */
+/* - int channel: channel #, either 0 or 1                              */
+/* - float output: output voltage, (8-bit 255 max) - scales to 5v       */
+/************************************************************************/
 void change_dac_output(int channel, float output) {
 	uint8_t outputConv = (output/5.0f)*255; // convert float to value between 0-255.
 
@@ -156,6 +202,11 @@ void change_dac_output(int channel, float output) {
 }
 
 // UTILITY
+
+/************************************************************************/
+/* Converts a string to its 8bit int equivalent                         */
+/* -const char *s: number string to convert                             */
+/************************************************************************/
 uint8_t atou8(const char *s)
 {
 	uint8_t v = 0;
@@ -163,6 +214,13 @@ uint8_t atou8(const char *s)
 	return v;
 }
 
+/************************************************************************/
+/* Reads in the input arguments and converts to their integer form based*/
+/* on command structure command,arg1,arg2,argi                          */
+/* -char* buffer: command string buffer                                 */
+/* -int* args: arg array, should allocated size of #args expected       */
+/* -int size: # of args to search for                                   */
+/************************************************************************/
 uint8_t read_int_args(char* buffer, int* args, int size) {
 	char tempBuff[7];
 	uint8_t strIndex = 0;
@@ -190,6 +248,13 @@ uint8_t read_int_args(char* buffer, int* args, int size) {
 	return strIndex;
 }
 
+/************************************************************************/
+/* Reads in the input arguments and converts to their float form based  */
+/* on command structure command,arg1,arg2,argi                          */
+/* -char* buffer: command string buffer                                 */
+/* -float* args: arg array, should allocated size of #args expected     */
+/* -int size: # of args to search for                                   */
+/************************************************************************/
 void read_float_args(char* buffer, float* args, int size) {
 	char tempBuff[7];
 	uint8_t strIndex = 0;
@@ -215,6 +280,12 @@ void read_float_args(char* buffer, float* args, int size) {
 	}
 }
 
+
+/************************************************************************/
+/* Reads in serial command until carriage stop reached                  */
+/* -char* buff: buffer to store command string                          */
+/* -uint8_t size: # of args to search for                               */
+/************************************************************************/
 void read_command(char* buff, uint8_t size) {
 	char c[1];
 	uint8_t index = 0;
@@ -229,6 +300,10 @@ void read_command(char* buff, uint8_t size) {
 }
 
 // COMMANDS
+
+/************************************************************************/
+/* Loads input with read_command() and controls main command logic      */
+/************************************************************************/
 void handle_input() {
 	char command[8] = "";
 	read_command(command, 8);
