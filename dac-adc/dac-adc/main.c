@@ -150,7 +150,7 @@ void change_dac_output(int channel, float output) {
 	uint8_t outputConv = (output/5.0f)*255; // convert float to value between 0-255.
 
 	i2c_start_wait(DAC_ADDRESS+I2C_WRITE);
-	i2c_write(0b00000000); // No reset, normal op. state, address 0
+	i2c_write(0b00000000 + channel); // No reset, normal op. state, address 0
 	i2c_write(outputConv); // Output byte, supports any 8-bit val
 	i2c_stop();
 }
@@ -277,7 +277,7 @@ int main(void)
 
 	change_dac_output(0, 5.0f);
 	change_dac_output(1, 5.0f);
-	UART_puts("DAC Initialized!\n");
+	UART_puts("DAC Initialized to 5.00V\n");
 	
 	while(1)
 	{
