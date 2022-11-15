@@ -127,15 +127,28 @@ void output_adc_meas() {
 	UART_puts(" V\n");
 }
 
-// COMMANDS
-void handle_input(char* buf, uint8_t n) {
-	if (buf[0] == 'G')
-	{
-		output_adc_meas();
+// UTILITY
+void read_args(char* argBuff, int size) {
+	char c[1];
+	UART_getLine(c, 1);
+	int buffIndex = 0;
+	
+	while (c[0] != '\n') {
+		argBuff[buffIndex++] = c[0];
+		UART_getLine(c, 1);
 	}
 }
 
-// UTILITY
+// COMMANDS
+void handle_input(char* buf, uint8_t n) {
+	if (buf[0] == 'G') {
+		output_adc_meas();
+	} else if (buf[0] == 'M') {
+		char argBuff[10] = "";
+		read_args(argBuff, 2);
+		UART_puts(argBuff);
+	}
+}
 
 // Main routine
 int main(void)
