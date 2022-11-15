@@ -211,7 +211,7 @@ void read_float_args(char* buffer, float* args, int size) {
 		
 		val = atof(tempBuff);
 		args[argIndex++] = val;
-		strIndex++; // skip the comma
+		strIndex++; // skips the next comma
 	}
 }
 
@@ -237,11 +237,11 @@ void handle_input() {
 		output_adc_meas();
 	} else if (command[0] == 'M') {
 		int argBuff[2];
-		read_int_args(&command[1], argBuff, 2); // command[1] since we don't want to include the start command M
+		read_int_args(&command[2], argBuff, 2); // command[2] since we don't want to include the start command M,
 		sample_multiple_adc_meas(argBuff[0], argBuff[1]);
 	} else if (command[0] == 'S') {
 		int channelArg[1];
-		uint8_t floatStartPoint = read_int_args(&command[1], channelArg, 1)+1; // +1 to skip the , character
+		uint8_t floatStartPoint = read_int_args(&command[2], channelArg, 1)+2; // +2 to adjust for already added offset of buffer
 		
 		float voltArg[1]; 
 		read_float_args(&command[floatStartPoint], voltArg, 1);
