@@ -13,11 +13,13 @@
 #define BAUD_RATE_230400_BPS 103 // BAUD = 9600 | (UBRRn = 16MHz / (16*9600-des. BAUD)) - 1
 #define INPUT_BUFFER_LENGTH  8     // Maximum input buffer read.
 #define ADC_CHANNEL_0   0b00000000 // ADC0 Channel
+#define DAC_WRITE_ADDRESS		0x00
 
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
 #include <stdio.h>
+#include "i2cmaster.h"
 
 // START OF UART
 /*
@@ -89,9 +91,6 @@ void UART_getLine(char* buf, uint8_t n)
 	buf[bufIdx] = 0;
 }
 
-// BEGIN I2C
-
-
 // BEGIN ADC
 void init_adc() {
 	ADMUX |= (1<<REFS0); // Select Vref=AVcc
@@ -144,6 +143,17 @@ void sample_multiple_adc_meas(int amount, int delay) {
 	sprintf(out, "t=%d s, ", counter * delay);
 	UART_puts(out);
 	output_adc_meas();
+}
+
+// I2C
+#define DAC_ADDRESS 0x00 // DAC address is 0
+
+void change_dac_output() {
+	i2c_start_wait(DAC_ADDRESS+I2C_WRITE);
+	UART_puts("sending data");
+	i2c_write(0b00000000); // No reset, normal op. state, address 0
+	i2c_write(0b00001111); // Output byte, supports any 8-bit val
+	i2c_stop();
 }
 
 // UTILITY
@@ -217,6 +227,9 @@ int main(void)
 	// Initializers:
 	init_adc();      // Enables and configures ADC
 	UART_init(ubrr); // Enables and configures UART serial com
+	i2c_init();
+
+	change_dac_output();
 	
 	while(1)
 	{
