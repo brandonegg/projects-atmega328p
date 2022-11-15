@@ -128,25 +128,72 @@ void output_adc_meas() {
 }
 
 // UTILITY
-void read_args(char* argBuff, int size) {
+uint8_t atou8(const char *s)
+{
+	uint8_t v = 0;
+	while (*s) { v = (v << 1) + (v << 3) + (*(s++) - '0'); }
+	return v;
+}
+
+void read_args(int* args, int size) {
+	uint8_t maxBuffSize = 8;
 	char c[1];
+	char argBuff[maxBuffSize];
+	char tempBuff[maxBuffSize];
+	uint8_t strIndex = 0;
+	uint8_t argIndex = 0;
+	uint8_t tempIndex;
+	uint8_t val;
 	UART_getLine(c, 1);
-	int buffIndex = 0;
 	
-	while (c[0] != '\n') {
-		argBuff[buffIndex++] = c[0];
+	while (c[0] != '\n' && strIndex < maxBuffSize) {
+		argBuff[strIndex++] = c[0];
 		UART_getLine(c, 1);
+	}
+	
+	argIndex = 0;
+	strIndex = 0;
+	while (argIndex < size) {
+		tempIndex = 0;
+		while (strIndex < maxBuffSize && argBuff[strIndex] != ',') {
+			tempBuff[tempIndex++] = argBuff[strIndex];
+			strIndex++;
+		}
+		
+		val = atou8(tempBuff);
+		args[argIndex++] = val;
 	}
 }
 
+void read_command(char* buff, uint8_t size) {
+	char c[1];
+	uint8_t index = 0;
+	c[0] = UART_getc();
+	
+	while (index+1 < size && c[0] != 10) { // 10 = end of line character for arduino interpreter
+		buff[index++] = c[0];
+		c[0] = UART_getc();
+	}
+
+	c[index] = 10;
+}
+
 // COMMANDS
-void handle_input(char* buf, uint8_t n) {
-	if (buf[0] == 'G') {
+void handle_input() {
+	char command[8] = "";
+	read_command(command, 8);
+
+	if (command[0] == 'G') {
 		output_adc_meas();
-	} else if (buf[0] == 'M') {
-		char argBuff[10] = "";
+	} else if (command[0] == 'M') {
+		int argBuff[2];
 		read_args(argBuff, 2);
-		UART_puts(argBuff);
+		
+	    char out[10] = "";
+		sprintf(out, "arg 1 = %d, arg 2 = %d\n", argBuff[0], argBuff[1]);
+		UART_puts(out);
+	} else {
+		UART_puts("Command not found!\n");
 	}
 }
 
@@ -155,7 +202,6 @@ int main(void)
 {
 	// Memory Assignment
 	unsigned int ubrr = BAUD_RATE_230400_BPS;
-	char buf[INPUT_BUFFER_LENGTH];
 	
 	// Initializers:
 	init_adc();      // Enables and configures ADC
@@ -163,8 +209,7 @@ int main(void)
 	
 	while(1)
 	{
-		UART_getLine(buf, 1);
-		handle_input(buf, INPUT_BUFFER_LENGTH);
+		handle_input();
 	}
 }
 
