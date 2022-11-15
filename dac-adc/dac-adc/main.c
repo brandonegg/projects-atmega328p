@@ -146,7 +146,7 @@ void sample_multiple_adc_meas(int amount, int delay) {
 }
 
 // I2C
-#define DAC_ADDRESS 0x00 // DAC address is 0
+#define DAC_ADDRESS 0b01011000 // See data sheet, AD1 and AD0 are low which correlate to bits 1,2 of the DAC_ADDRESS BYTE
 
 void change_dac_output() {
 	i2c_start_wait(DAC_ADDRESS+I2C_WRITE);
