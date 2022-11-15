@@ -9,6 +9,7 @@
 #define F_CPU 16000000UL // 16 MHZ Clock
 #endif
 
+#define _OPEN_SYS_ITOA_EXT
 #define BAUD_RATE_230400_BPS 103 // BAUD = 9600 | (UBRRn = 16MHz / (16*9600-des. BAUD)) - 1
 #define INPUT_BUFFER_LENGTH  8     // Maximum input buffer read.
 #define ADC_CHANNEL_0   0b00000000 // ADC0 Channel
@@ -16,6 +17,7 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
+#include <stdio.h>
 
 // START OF UART
 /*
@@ -103,15 +105,26 @@ void read_adc(uint8_t ADCchannel)
 	while( ADCSRA & (1<<ADSC) ); // wait until ADC conversion is complete
 }
 
+void adc_to_voltage(uint16_t* adcMeas, float* result) {
+	*result = 5; // 5v = 1023 - 0 (10bit).
+}
+
 void output_adc_meas() {
 	read_adc(ADC_CHANNEL_0);
 	
-	// uint16_t ADC_10bit_Result = 0; unused currently
+	uint16_t ADC_10bit_Result = 0;
 	uint8_t lowADC = ADCL;
 	uint8_t highADC = ADCH;
 
-	UART_puthex8(highADC);
-	UART_puthex8(lowADC);
+	ADC_10bit_Result = (highADC << 8) + lowADC;
+	float voltage = 0.0f;
+	adc_to_voltage(&ADC_10bit_Result, &voltage);
+
+	char out[4];
+	sprintf(out, "v=%f", voltage);
+	
+	UART_puts(out);
+	UART_puts(" V");
 }
 
 // COMMANDS
