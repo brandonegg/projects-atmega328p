@@ -19,6 +19,7 @@
 #include <util/delay.h>
 #include <avr/interrupt.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "i2cmaster.h"
 
 // START OF UART
@@ -145,10 +146,12 @@ void sample_multiple_adc_meas(int amount, int delay) {
 // I2C
 #define DAC_ADDRESS 0b01011000 // See data sheet, AD1 and AD0 are low which correlate to bits 1,2 of the DAC_ADDRESS BYTE
 
-void change_dac_output() {
+void change_dac_output(int channel, float output) {
+	uint8_t outputConv = (output/5.0f)*255; // convert float to value between 0-255.
+
 	i2c_start_wait(DAC_ADDRESS+I2C_WRITE);
 	i2c_write(0b00000000); // No reset, normal op. state, address 0
-	i2c_write(0b00001111); // Output byte, supports any 8-bit val
+	i2c_write(outputConv); // Output byte, supports any 8-bit val
 	i2c_stop();
 }
 
@@ -160,7 +163,7 @@ uint8_t atou8(const char *s)
 	return v;
 }
 
-void read_args(char* buffer, int* args, int size) {
+uint8_t read_int_args(char* buffer, int* args, int size) {
 	char tempBuff[7];
 	uint8_t strIndex = 0;
 	uint8_t argIndex = 0;
@@ -180,6 +183,33 @@ void read_args(char* buffer, int* args, int size) {
 		}
 		
 		val = atou8(tempBuff);
+		args[argIndex++] = val;
+		strIndex++; // skip the comma
+	}
+	
+	return strIndex;
+}
+
+void read_float_args(char* buffer, float* args, int size) {
+	char tempBuff[7];
+	uint8_t strIndex = 0;
+	uint8_t argIndex = 0;
+	uint8_t tempIndex;
+	float val;
+	
+	argIndex = 0;
+	strIndex = 0;
+	while (argIndex < size) {
+		tempIndex = 0;
+		while (strIndex < 7 && buffer[strIndex] != ',') {
+			tempBuff[tempIndex++] = buffer[strIndex];
+			strIndex++;
+		}
+		while (tempIndex < 7) {
+			tempBuff[tempIndex++] = '\n';
+		}
+		
+		val = atof(tempBuff);
 		args[argIndex++] = val;
 		strIndex++; // skip the comma
 	}
@@ -207,8 +237,28 @@ void handle_input() {
 		output_adc_meas();
 	} else if (command[0] == 'M') {
 		int argBuff[2];
-		read_args(&command[1], argBuff, 2); // command[1] since we don't want to include the start command M
+		read_int_args(&command[1], argBuff, 2); // command[1] since we don't want to include the start command M
 		sample_multiple_adc_meas(argBuff[0], argBuff[1]);
+	} else if (command[0] == 'S') {
+		int channelArg[1];
+		uint8_t floatStartPoint = read_int_args(&command[1], channelArg, 1)+1; // +1 to skip the , character
+		
+		float voltArg[1]; 
+		read_float_args(&command[floatStartPoint], voltArg, 1);
+
+		if (channelArg[0] > 1 || channelArg[0] < 0) {
+			UART_puts("Channel must be 0 or 1\n");
+			return;
+		}
+		if (voltArg[0] > 5.00f) {
+			UART_puts("Voltage can't exceed 5V\n");
+			return;
+		}
+		
+		change_dac_output(channelArg[0], voltArg[0]);
+		char out[16];
+		sprintf(out, "DAC Channel %d set to %.2f V\n", channelArg[0], voltArg[0]);
+		UART_puts(out);
 	} else {
 		UART_puts("Command not found!\n");
 	}
@@ -225,7 +275,8 @@ int main(void)
 	UART_init(ubrr); // Enables and configures UART serial com
 	i2c_init();
 
-	change_dac_output();
+	change_dac_output(0, 5.0f);
+	change_dac_output(1, 5.0f);
 	UART_puts("DAC Initialized!\n");
 	
 	while(1)
