@@ -128,7 +128,7 @@ void output_adc_meas() {
 
 void sample_multiple_adc_meas(int amount, int delay) {
 	uint8_t counter = 0;
-	char out[8];
+	char out[10];
 	
 	while (counter < amount) {
 		sprintf(out, "t=%d s, ", counter * delay);
@@ -140,9 +140,6 @@ void sample_multiple_adc_meas(int amount, int delay) {
 		}
 		counter++;
 	}
-	sprintf(out, "t=%d s, ", counter * delay);
-	UART_puts(out);
-	output_adc_meas();
 }
 
 // I2C
@@ -150,7 +147,6 @@ void sample_multiple_adc_meas(int amount, int delay) {
 
 void change_dac_output() {
 	i2c_start_wait(DAC_ADDRESS+I2C_WRITE);
-	UART_puts("sending data");
 	i2c_write(0b00000000); // No reset, normal op. state, address 0
 	i2c_write(0b00001111); // Output byte, supports any 8-bit val
 	i2c_stop();
@@ -230,10 +226,12 @@ int main(void)
 	i2c_init();
 
 	change_dac_output();
+	UART_puts("DAC Initialized!\n");
 	
 	while(1)
 	{
 		handle_input();
+		_delay_ms(1);
 	}
 }
 
