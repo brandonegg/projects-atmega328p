@@ -127,6 +127,25 @@ void output_adc_meas() {
 	UART_puts(" V\n");
 }
 
+void sample_multiple_adc_meas(int amount, int delay) {
+	uint8_t counter = 0;
+	char out[8];
+	
+	while (counter < amount) {
+		sprintf(out, "t=%d s, ", counter * delay);
+		UART_puts(out);
+		output_adc_meas();
+		
+		for(uint8_t i = 0; i < delay; i++) {
+			_delay_ms(1000);
+		}
+		counter++;
+	}
+	sprintf(out, "t=%d s, ", counter * delay);
+	UART_puts(out);
+	output_adc_meas();
+}
+
 // UTILITY
 uint8_t atou8(const char *s)
 {
@@ -183,10 +202,7 @@ void handle_input() {
 	} else if (command[0] == 'M') {
 		int argBuff[2];
 		read_args(&command[1], argBuff, 2); // command[1] since we don't want to include the start command M
-		
-	    char out[10] = "";
-		sprintf(out, "arg 1 = %d, arg 2 = %d\n", argBuff[0], argBuff[1]);
-		UART_puts(out);
+		sample_multiple_adc_meas(argBuff[0], argBuff[1]);
 	} else {
 		UART_puts("Command not found!\n");
 	}
