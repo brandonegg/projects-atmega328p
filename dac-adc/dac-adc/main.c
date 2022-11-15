@@ -9,7 +9,9 @@
 #define F_CPU 16000000UL // 16 MHZ Clock
 #endif
 
-#define BAUD_RATE_230400_BPS  103 // BAUD = 9600 | (UBRRn = 16MHz / (16*9600-des. BAUD)) - 1
+#define BAUD_RATE_230400_BPS 103 // BAUD = 9600 | (UBRRn = 16MHz / (16*9600-des. BAUD)) - 1
+#define INPUT_BUFFER_LENGTH  8     // Maximum input buffer read.
+#define ADC_CHANNEL_0   0b00000000 // ADC0 Channel
 
 #include <avr/io.h>
 #include <util/delay.h>
@@ -84,47 +86,59 @@ void UART_getLine(char* buf, uint8_t n)
 	// ensure buffer is null terminated
 	buf[bufIdx] = 0;
 }
-// END OF UART
 
 // BEGIN I2C
 
-// END OF I2C
 
 // BEGIN ADC
-void start_adc_meas() {
-	ADCSRA |= (1<<ADEN)  | (1<<ADSC);      // Enable ADC and Start the conversion
-	while( !(ADCSRA & (1<<ADIF)) );       // Wait for conversion to finish
-	ADCSRA |= (1<<ADIF);   // Clear ADIF,ADIF is cleared by writing a 1 to ADSCRA
+void init_adc() {
+	ADMUX |= (1<<REFS0); // Select Vref=AVcc
+	ADCSRA |= (1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0)|(1<<ADEN); //set prescaller to 128 and enable ADC
 }
-// END ADC
 
-#define ADC_Channel_0   0b00000000 // ADC0 Channel
+void read_adc(uint8_t ADCchannel)
+{
+	ADMUX = (ADMUX & 0xF0) | (ADCchannel & 0x0F); //select ADC channel with safety mask
+	ADCSRA |= (1<<ADSC); //single conversion mode
+	while( ADCSRA & (1<<ADSC) ); // wait until ADC conversion is complete
+}
+
+void output_adc_meas() {
+	read_adc(ADC_CHANNEL_0);
+	
+	// uint16_t ADC_10bit_Result = 0; unused currently
+	uint8_t lowADC = ADCL;
+	uint8_t highADC = ADCH;
+
+	UART_puthex8(highADC);
+	UART_puthex8(lowADC);
+}
+
+// COMMANDS
+void handle_input(char* buf, uint8_t n) {
+	if (buf[0] == 'G')
+	{
+		output_adc_meas();
+	}
+}
+
+// UTILITY
+
+// Main routine
 int main(void)
 {
-	uint16_t ADC_10bit_Result = 0;
+	// Memory Assignment
 	unsigned int ubrr = BAUD_RATE_230400_BPS;
-	char data[] = "Hello from ATmega428p  ";
+	char buf[INPUT_BUFFER_LENGTH];
 	
-	ADCSRA |= (1<<ADPS2) | (1<<ADPS1) | (1<<ADPS0);// Select ADC Prescalar to 128,
-	// 11.0598MHz/128 = 85KHz
-	ADMUX = ADMUX & 0xF0;           //Clear MUX0-MUX3,Important in Multichannel conv
-	ADMUX|= ADC_Channel_0;         // Select the ADC channel to convert,Aref pin tied to 5V
-	
-	UART_init(ubrr);
+	// Initializers:
+	init_adc();      // Enables and configures ADC
+	UART_init(ubrr); // Enables and configures UART serial com
 	
 	while(1)
 	{
-		char buf[8]; //arbitrary size of 1 register for now
 		UART_getLine(buf, 1);
-		if (buf[0] == 'G') 
-		{
-			start_adc_meas();
-			
-			ADC_10bit_Result   =  ADC;
-			UART_puts(data);
-			unsigned char lower = (ADC_10bit_Result & 0xFF);
-			UART_puthex8(ADCL);
-		}
+		handle_input(buf, INPUT_BUFFER_LENGTH);
 	}
 }
 
