@@ -107,54 +107,70 @@ void UART_getLine(uint8_t* buf, uint8_t n)
 	buf[bufIdx] = 0; // ensure buffer is null terminated
 }
 
-char getLowByte(char val) {
+/************************************************************************/
+/* Simple function for returning high and low byte of 16-bit value      */
+/************************************************************************/
+uint8_t getLowByte(uint16_t val) {
 	return (val & 0xff);
 }
-
-char getHighByte(uint16_t val) {
+uint8_t getHighByte(uint16_t val) {
 	return (val >> 8) & 0xff;
 }
 
-// Finger print scanner
-void startFPS() {
-	uint8_t COMMAND_START_CODE_1 = 0x55;
-	uint8_t COMMAND_START_CODE_2 = 0xAA;
-	uint8_t COMMAND_DEVICE_ID_1 = 0x01;
-	uint8_t COMMAND_DEVICE_ID_2 = 0x00;
-	uint16_t command = 0x0001; // Start command 0x01
-	uint8_t param[4] = {0x00, 0x00, 0x00, 0x00};
-	
-	uint16_t checkSumVal = COMMAND_START_CODE_1 + COMMAND_START_CODE_2 + COMMAND_DEVICE_ID_1 + COMMAND_DEVICE_ID_2 + command + param[0] + param[1] + param[2] + param[3];
+// START OF FPS
+/*
+   The finger print scanner used for this lab can be found here:
+   https://learn.sparkfun.com/tutorials/fingerprint-scanner-gt-521fxx-hookup-guide?_ga=2.161334004.852986231.1669753998-1536484512.1668029572
+ */
+#define COMMAND_START_CODE_1 0x55
+#define COMMAND_START_CODE_2 0xAA
+#define COMMAND_DEVICE_ID_1 0x01
+#define COMMAND_DEVICE_ID_2 = 0x00
+
+/************************************************************************/
+/* Sends command packet to FPS. Returns the 12 byte response (points to */
+/* first byte)                                                          */
+/* - uint16_t command: Command to send                                  */
+/* - uint8_t* params: Parameters to send (must allocate 4 bytes)        */
+/************************************************************************/
+uint8_t* sendFPSCommand(uint16_t command, uint8_t* params) {
+	// Compute checksum:
+	uint16_t checkSumVal = COMMAND_START_CODE_1 + COMMAND_START_CODE_2 + COMMAND_DEVICE_ID_1 + COMMAND_DEVICE_ID_2 + command
+	checkSumVal += params[0] + param[1] + param[2] + param[3]; // Add the params
 
 	uint8_t send[12] = {COMMAND_START_CODE_1, COMMAND_START_CODE_2, COMMAND_DEVICE_ID_1, COMMAND_DEVICE_ID_2, param[0], param[1], param[2], param[3], getLowByte(command), getHighByte(command), getLowByte(checkSumVal), getHighByte(checkSumVal)};
 	UART_puts(send, 12);
-	
+
 	uint8_t buff[12];
 	UART_getLine(buff, 12);
-	
+	return buff; // Return the response pointer
+
 	/*
-	* this is an example of how you can check whether it actually received the command: 0x31 is not acknowledge (error), 0x30 is acknowledge
+	 * this is an example of how you can check whether it actually received the command: 0x31 is not acknowledge (error), 0x30 is acknowledge
 	if (buff[8] == 0x31) {
 		PORTB = (1 << 5);
 	}
 	*/
 }
 
-void setLED(uint8_t on) {
-	uint8_t COMMAND_START_CODE_1 = 0x55;
-	uint8_t COMMAND_START_CODE_2 = 0xAA;
-	uint8_t COMMAND_DEVICE_ID_1 = 0x01;
-	uint8_t COMMAND_DEVICE_ID_2 = 0x00;
+/************************************************************************/
+/* Shortcut for sending the FPS start command                           */
+/************************************************************************/
+void startFPS() {
+	uint16_t command = 0x0001; // Start command 0x01
+	uint8_t params[4] = {0x00, 0x00, 0x00, 0x00};
+
+	sendFPSCommand(command, params)
+}
+
+/************************************************************************/
+/* Shortcut for turning LED on/off                                      */
+/************************************************************************/
+void setLED(bool on) {
 	uint16_t command = 0x0012; // Start command 0x01
 	uint8_t param[4] = {on, 0x00, 0x00, 0x00};
 	
-	uint16_t checkSumVal = COMMAND_START_CODE_1 + COMMAND_START_CODE_2 + COMMAND_DEVICE_ID_1 + COMMAND_DEVICE_ID_2 + command + param[0] + param[1] + param[2] + param[3];
-
-	uint8_t send[12] = {COMMAND_START_CODE_1, COMMAND_START_CODE_2, COMMAND_DEVICE_ID_1, COMMAND_DEVICE_ID_2, param[0], param[1], param[2], param[3], getLowByte(command), getHighByte(command), getLowByte(checkSumVal), getHighByte(checkSumVal)};
-	UART_puts(send, 12);
-	
-	uint8_t buff[12];
-	UART_getLine(buff, 12);
+	sendFPSCommand(command, params)
 }
 
 int main(void)
