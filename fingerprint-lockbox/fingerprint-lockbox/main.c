@@ -172,6 +172,38 @@ void startFingerEnroll(uint16_t id) {
 	uint8_t response[12];
 	
 	sendFPSCommand(command, params, response);
+	if (response[4] == 0x05 || response[8] == 0x31) { // Bad finger - 0x100C or 0x100D
+		PORTB = (1 << 5); // there was error
+	}
+}
+
+/************************************************************************/
+/* Capture a finger print image. Must be done prior to enrollment step  */
+/************************************************************************/
+void captureFingerPrint() {
+	uint16_t command = 0x60;
+	uint8_t params[4] = {0x00, 0x00, 0x00, 0x00};
+	uint8_t response[12];
+	
+	sendFPSCommand(command, params, response);
+	if (response[4] == 0x31) {
+		PORTB = (1 << 5); // there was error
+	}
+}
+
+/************************************************************************/
+/* delete a fingerprint. Use 0xFF to delete all fingerprints            */
+/* uint16_t id: id to delete or 0xFF for all                            */
+/************************************************************************/
+void deleteFingerPrint(uint16_t id) {
+	uint16_t command = 0x40;
+	if (id == 0xff) {
+		command += 1; // 0x41 to delete all
+	}
+	uint8_t params[4] = {getLowByte(id), getHighByte(id), 0x00, 0x00};
+	uint8_t response[12];
+	
+	sendFPSCommand(command, params, response);
 }
 
 /************************************************************************/
@@ -184,7 +216,7 @@ void handleEnrollStep(uint8_t step) {
 	uint8_t response[12];
 	
 	sendFPSCommand(command, params, response);
-	if (response[8] == 0x31) {
+	if (response[4] == 0x31) { // Bad finger - 0x100C or 0x100D
 		PORTB = (1 << 5); // there was error
 	}
 }
@@ -229,16 +261,44 @@ void waitForFingerRelease() {
 }
 
 /************************************************************************/
+/* Verify finger                                                        */
+/* uint8_t step: finger id to verify                                    */
+/* returns result                                                       */
+/************************************************************************/
+void verifyFinger(uint8_t id, uint8_t* output) {
+	uint16_t command = 0x0050; // Start command 0x01
+	uint8_t params[4] = {getLowByte(id), getHighByte(id), 0x00, 0x00};
+	uint8_t response[12];
+	
+	setLED(1);
+	waitForFingerPressed();
+	captureFingerPrint();
+	sendFPSCommand(command, params, response);
+	waitForFingerRelease();
+	setLED(0);
+	
+	if (response[4] == 0x00) {
+		*output = 0x01;
+	} else {
+		*output = 0x00;
+	}
+}
+
+/************************************************************************/
 /* Handles the entire fingerprint enrollment flow                       */
 /************************************************************************/
 void enrollFinger(uint16_t id) {
 	setLED(1);
 	startFingerEnroll(id);
-	waitForFingerPressed();
-	waitForFingerRelease();
-	//handleEnrollStep(0);
-	//handleEnrollStep(1);
-	//handleEnrollStep(2);
+	
+	for (int i = 0; i < 3; i++) {
+		waitForFingerPressed();
+		captureFingerPrint();
+		handleEnrollStep(i);
+		waitForFingerRelease();
+	}
+	
+	setLED(0);
 }
 
 int main(void)
@@ -253,6 +313,18 @@ int main(void)
 	startFPS();
 	setLED(0);
 	
-    enrollFinger(0x00);
+	deleteFingerPrint(0xFF);
+    enrollFinger(0x01);
+	
+	uint8_t result;
+	while (1) {
+		verifyFinger(0x01, &result);
+		if (result >= 0x01) {
+			PORTB = (1 << 5);
+		} else {
+			PORTB = (0 << 5);
+		}
+	}
+	
 }
 
