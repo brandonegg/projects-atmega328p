@@ -163,6 +163,33 @@ void startFPS() {
 }
 
 /************************************************************************/
+/* Send start fingerprint enrollment command                            */
+/* uint16_t id - ID the fingerprint will be stored under                */
+/************************************************************************/
+void startFingerEnroll(uint16_t id) {
+	uint16_t command = 0x0022; // Enroll command 22
+	uint8_t params[4] = {getLowByte(id), getHighByte(id), 0x00, 0x00};
+	uint8_t response[12];
+	
+	sendFPSCommand(command, params, response);
+}
+
+/************************************************************************/
+/* Send start fingerprint enrollment command                            */
+/* uint8_t step: enroll step (0-2)                                      */
+/************************************************************************/
+void handleEnrollStep(uint8_t step) {
+	uint16_t command = 0x0023 + step; // Enroll 23 = Enroll 1, step is offset
+	uint8_t params[4] = {0x00, 0x00, 0x00, 0x00};
+	uint8_t response[12];
+	
+	sendFPSCommand(command, params, response);
+	if (response[8] == 0x31) {
+		PORTB = (1 << 5); // there was error
+	}
+}
+
+/************************************************************************/
 /* Shortcut for turning LED on/off                                      */
 /************************************************************************/
 void setLED(uint8_t on) {
@@ -173,25 +200,59 @@ void setLED(uint8_t on) {
 	sendFPSCommand(command, params, response);
 }
 
+/************************************************************************/
+/* Finger pressed                                                       */
+/************************************************************************/
+void waitForFingerPressed() {
+	uint16_t command = 0x0026; // Start command 0x01
+	uint8_t params[4] = {0x00, 0x00, 0x00, 0x00};
+	uint8_t response[12];
+	
+	sendFPSCommand(command, params, response);
+	while (response[4] != 0x00) { // response param 0 for finger pressed
+		sendFPSCommand(command, params, response);
+	}
+}
+
+/************************************************************************/
+/* Finger released                                                      */
+/************************************************************************/
+void waitForFingerRelease() {
+	uint16_t command = 0x0026; // Start command 0x01
+	uint8_t params[4] = {0x00, 0x00, 0x00, 0x00};
+	uint8_t response[12];
+	
+	sendFPSCommand(command, params, response);
+	while (response[4] == 0x00) { // response param 0 for finger pressed
+		sendFPSCommand(command, params, response);
+	}
+}
+
+/************************************************************************/
+/* Handles the entire fingerprint enrollment flow                       */
+/************************************************************************/
+void enrollFinger(uint16_t id) {
+	setLED(1);
+	startFingerEnroll(id);
+	waitForFingerPressed();
+	waitForFingerRelease();
+	//handleEnrollStep(0);
+	//handleEnrollStep(1);
+	//handleEnrollStep(2);
+}
+
 int main(void)
 {
 	//TESTING STATUS L LED
-	//DDRB = (1 << 5);
-	//PORTB = (0 << 5);
+	DDRB = (1 << 5);
+	PORTB = (0 << 5);
 	
-    /* Replace with your application code */
 	unsigned int ubrr = BAUD_RATE_230400_BPS;
 	UART_init(ubrr);
 
 	startFPS();
 	setLED(0);
 	
-    while (1) 
-    {
-		setLED(1);
-		_delay_ms(1000);
-		setLED(0);
-		_delay_ms(1000);
-    }
+    enrollFinger(0x00);
 }
 
