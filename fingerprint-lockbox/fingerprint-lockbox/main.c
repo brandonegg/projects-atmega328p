@@ -125,26 +125,24 @@ uint8_t getHighByte(uint16_t val) {
 #define COMMAND_START_CODE_1 0x55
 #define COMMAND_START_CODE_2 0xAA
 #define COMMAND_DEVICE_ID_1 0x01
-#define COMMAND_DEVICE_ID_2 = 0x00
+#define COMMAND_DEVICE_ID_2 0x00
 
 /************************************************************************/
 /* Sends command packet to FPS. Returns the 12 byte response (points to */
 /* first byte)                                                          */
 /* - uint16_t command: Command to send                                  */
 /* - uint8_t* params: Parameters to send (must allocate 4 bytes)        */
+/* - uint8_t* retBuff: Response buffer                                  */
 /************************************************************************/
-uint8_t* sendFPSCommand(uint16_t command, uint8_t* params) {
+void sendFPSCommand(uint16_t command, uint8_t* params, uint8_t* retBuff) {
 	// Compute checksum:
-	uint16_t checkSumVal = COMMAND_START_CODE_1 + COMMAND_START_CODE_2 + COMMAND_DEVICE_ID_1 + COMMAND_DEVICE_ID_2 + command
-	checkSumVal += params[0] + param[1] + param[2] + param[3]; // Add the params
+	uint16_t checkSumVal = COMMAND_START_CODE_1 + COMMAND_START_CODE_2 + COMMAND_DEVICE_ID_1 + COMMAND_DEVICE_ID_2 + command;
+	checkSumVal += params[0] + params[1] + params[2] + params[3]; // Add the params
 
-	uint8_t send[12] = {COMMAND_START_CODE_1, COMMAND_START_CODE_2, COMMAND_DEVICE_ID_1, COMMAND_DEVICE_ID_2, param[0], param[1], param[2], param[3], getLowByte(command), getHighByte(command), getLowByte(checkSumVal), getHighByte(checkSumVal)};
+	uint8_t send[12] = {COMMAND_START_CODE_1, COMMAND_START_CODE_2, COMMAND_DEVICE_ID_1, COMMAND_DEVICE_ID_2, params[0], params[1], params[2], params[3], getLowByte(command), getHighByte(command), getLowByte(checkSumVal), getHighByte(checkSumVal)};
 	UART_puts(send, 12);
 
-	uint8_t buff[12];
-	UART_getLine(buff, 12);
-	return buff; // Return the response pointer
-
+	UART_getLine(retBuff, 12);
 	/*
 	 * this is an example of how you can check whether it actually received the command: 0x31 is not acknowledge (error), 0x30 is acknowledge
 	if (buff[8] == 0x31) {
@@ -159,18 +157,20 @@ uint8_t* sendFPSCommand(uint16_t command, uint8_t* params) {
 void startFPS() {
 	uint16_t command = 0x0001; // Start command 0x01
 	uint8_t params[4] = {0x00, 0x00, 0x00, 0x00};
-
-	sendFPSCommand(command, params)
+	uint8_t response[12];
+	
+	sendFPSCommand(command, params, response);
 }
 
 /************************************************************************/
 /* Shortcut for turning LED on/off                                      */
 /************************************************************************/
-void setLED(bool on) {
+void setLED(uint8_t on) {
 	uint16_t command = 0x0012; // Start command 0x01
-	uint8_t param[4] = {on, 0x00, 0x00, 0x00};
+	uint8_t params[4] = {on, 0x00, 0x00, 0x00};
+	uint8_t response[12];
 	
-	sendFPSCommand(command, params)
+	sendFPSCommand(command, params, response);
 }
 
 int main(void)
