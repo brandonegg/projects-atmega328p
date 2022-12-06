@@ -329,29 +329,48 @@ void rotateStepper(uint8_t direction, uint16_t amount) {
 	}
 }
 
+/************************************************************************/
+/* toggles whether lockbox is open                                      */
+/************************************************************************/
+uint8_t open_state = 0;
+void setLockBoxDoor(uint8_t open) {
+	if (open == 1) {
+		open_state = 1;
+		rotateStepper(0, 200);
+	} else {
+		open_state = 0;
+		rotateStepper(1, 200);
+	}
+}
+
+/************************************************************************/
+/* toggles whether lockbox is open                                      */
+/************************************************************************/
+void toggleOpen() {
+	if (open_state == 0) {
+		setLockBoxDoor(1);
+	} else {
+		setLockBoxDoor(0);
+	}
+}
+
+/************************************************************************/
+/* Initializes proper pins for stepper controller                       */
+/************************************************************************/
 void initStepper() {
 	DDRB = DDRB | 0x0f; // First four pins of PORTB set as outputs for stepper control
 	PORTB = PORTB & 0xf0; // Set those pins to off
 }
 
-int main(void){
-	initStepper();
-
-	while(1){                     /* main loop here */
-		rotateStepper(0, 200);
-		rotateStepper(1, 200);
-	}
-}
-
-/*
 int main(void)
 {
 	//TESTING STATUS L LED
-	DDRB = (1 << 5);
-	PORTB = (0 << 5);
+	//DDRB = (1 << 5);
+	//PORTB = (0 << 5);
 	
 	unsigned int ubrr = BAUD_RATE_230400_BPS;
 	UART_init(ubrr);
+	initStepper();
 
 	startFPS();
 	setLED(0);
@@ -363,12 +382,10 @@ int main(void)
 	while (1) {
 		verifyFinger(0x01, &result);
 		if (result >= 0x01) {
-			PORTB = (1 << 5);
-		} else {
-			PORTB = (0 << 5);
+			toggleOpen();
 		}
 	}
 	
 }
-*/
+
 
