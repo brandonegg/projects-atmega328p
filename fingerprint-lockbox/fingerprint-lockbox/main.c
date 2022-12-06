@@ -274,14 +274,15 @@ void verifyFinger(uint8_t id, uint8_t* output) {
 	waitForFingerPressed();
 	captureFingerPrint();
 	sendFPSCommand(command, params, response);
+	if (response[4] == 0) {
+		*output = 0x01;
+		} else {
+		*output = 0x00;
+	}
+
 	waitForFingerRelease();
 	setLED(0);
 	
-	if (response[4] == 0x00) {
-		*output = 0x01;
-	} else {
-		*output = 0x00;
-	}
 }
 
 /************************************************************************/
@@ -364,9 +365,9 @@ void initStepper() {
 
 int main(void)
 {
-	//TESTING STATUS L LED
-	//DDRB = (1 << 5);
-	//PORTB = (0 << 5);
+	//TESTING STATUS L LED - PROGRAM MODE LIT
+	DDRB = (1 << 5);
+	PORTB = (1 << 5);
 	
 	unsigned int ubrr = BAUD_RATE_230400_BPS;
 	UART_init(ubrr);
@@ -378,9 +379,14 @@ int main(void)
 	deleteFingerPrint(0xFF);
     enrollFinger(0x01);
 	
+	PORTB = (0 << 5); // TEMP - Enrollment mode disabled
+	
 	uint8_t result;
 	while (1) {
+		setLED(1);
+		waitForFingerPressed();     // Wait for finger print before verifying a finger
 		verifyFinger(0x01, &result);
+		
 		if (result >= 0x01) {
 			toggleOpen();
 		}
