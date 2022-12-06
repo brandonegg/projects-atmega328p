@@ -383,8 +383,6 @@ int main(void)
 	
 	uint8_t result;
 	while (1) {
-		setLED(1);
-		waitForFingerPressed();     // Wait for finger print before verifying a finger
 		verifyFinger(0x01, &result);
 		
 		if (result >= 0x01) {
