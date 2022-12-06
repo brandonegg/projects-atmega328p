@@ -329,9 +329,14 @@ void rotateStepper(uint8_t direction, uint16_t amount) {
 	}
 }
 
+void initStepper() {
+	DDRB = DDRB | 0x0f; // First four pins of PORTB set as outputs for stepper control
+	PORTB = PORTB & 0xf0; // Set those pins to off
+}
+
 int main(void){
-	DDRB = 0xff;    /* Enable output on all of the B pins */
-	PORTB = 0x00;            /* Set them all to 0v */
+	initStepper();
+
 	while(1){                     /* main loop here */
 		rotateStepper(0, 200);
 		rotateStepper(1, 200);
