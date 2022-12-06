@@ -301,6 +301,44 @@ void enrollFinger(uint16_t id) {
 	setLED(0);
 }
 
+/* Stepper motor control:
+ */
+#define FIRST_STEP     0b0001
+#define SECOND_STEP    0b0010
+#define THIRD_STEP     0b0100
+#define FOURTH_STEP    0b1000
+#define STEP_DELAY     10 /* milliseconds between steps */
+
+/************************************************************************/
+/* Rotates the stepper amount in direction (0 for CW, 1 for CCW)        */
+/************************************************************************/
+void rotateStepper(uint8_t direction, uint16_t amount) {
+	uint8_t pattern[4] = {FIRST_STEP, SECOND_STEP, THIRD_STEP, FOURTH_STEP};
+	if (direction == 1) {
+		pattern[0] = FOURTH_STEP;
+		pattern[1] = THIRD_STEP;
+		pattern[2] = SECOND_STEP;
+		pattern[3] = FIRST_STEP;
+	}
+
+	for (uint16_t i = 0; i < amount; i++) {
+		for (uint8_t j = 0; j < 4; j ++) {
+			PORTB = pattern[j];
+			_delay_ms(STEP_DELAY);
+		}
+	}
+}
+
+int main(void){
+	DDRB = 0xff;    /* Enable output on all of the B pins */
+	PORTB = 0x00;            /* Set them all to 0v */
+	while(1){                     /* main loop here */
+		rotateStepper(0, 200);
+		rotateStepper(1, 200);
+	}
+}
+
+/*
 int main(void)
 {
 	//TESTING STATUS L LED
@@ -327,4 +365,5 @@ int main(void)
 	}
 	
 }
+*/
 
