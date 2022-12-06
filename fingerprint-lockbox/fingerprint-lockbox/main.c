@@ -365,6 +365,87 @@ void initStepper() {
 	PORTB = PORTB & 0xf0; // Set those pins to off
 }
 
+// START OF LCD
+/* The LCD is used to display helpful output to users of the lockbox
+ */
+/************************************************************************/
+/* Set mode to either command sending (0) or character mode (1)         */
+/************************************************************************/
+void setMode(uint8_t mode) {
+	if (mode == 1) {
+		PORTC |= (1 << PINC4);
+		} else {
+		PORTC &= 0xFF & (0 << PINC4);
+	}
+}
+
+/************************************************************************/
+/* Pulses E pin for communication with LCD                              */
+/************************************************************************/
+void pulseE() {
+	PORTC |= (1 << PINC5);
+	_delay_ms(0.0025); // 250 us, (tech spec is 230us)
+	PORTC &= 0xFF & (0 << PINC5);
+}
+
+/************************************************************************/
+/* Send LCD 8-bit command, requires command mode set to work            */
+/************************************************************************/
+void sendLCDCommand(uint8_t command) {
+	PORTC &= 0xF0; // Clear lower
+	PORTC |= getHighByte(command);
+	pulseE();
+	_delay_ms(5); // 100us delay
+	PORTC &= 0xF0; // Clear lower
+	PORTC |= getLowByte(command);
+	pulseE();
+	_delay_ms(5);
+}
+
+/************************************************************************/
+/* Display a single character inline, requires character mode set       */
+/************************************************************************/
+void displayLetter(char letter) {
+	PORTC &= 0xF0; // Clear lower
+	PORTC |= getHighByte(letter);
+	pulseE();
+	_delay_ms(0.1); // 100us delay
+	PORTC &= 0xF0; // Clear lower
+	PORTC |= getLowByte(letter);
+	pulseE();
+	_delay_ms(0.1);
+}
+
+/************************************************************************/
+/* Initializes LCD inputs and output pins                               */
+/************************************************************************/
+void initLCD() {
+	/* Basic pin specification
+	 * PC0-3 mapped to D4-7 input of LCD
+	 * PC4 - RS of LCD
+	 * PC5 - E of LCD
+	 */
+	DDRC = 0xFF; // Set all pins of PORTC as outputs
+	PORTC = 0x00; // Set all outputs to 0
+	
+	_delay_ms(100);
+	setMode(0);
+	
+	uint8_t lcdRoutine[6] = {0x33, 0x32, 0x28, 0x01, 0x0c, 0x06};
+	for (int i = 0; i < 6; i++) {
+		sendLCDCommand(lcdRoutine[i]);
+	}
+}
+
+void displayLetters(char* str) {
+	setMode(1);
+	
+	while (*str != '\n') {
+		displayLetter(*str);
+		str++;
+	}
+}
+
 int main(void)
 {
 	//TESTING STATUS L LED - PROGRAM MODE LIT
@@ -374,6 +455,7 @@ int main(void)
 	unsigned int ubrr = BAUD_RATE_230400_BPS;
 	UART_init(ubrr);
 	initStepper();
+	initLCD();
 
 	startFPS();
 	setLED(0);
@@ -382,6 +464,11 @@ int main(void)
     enrollFinger(0x01);
 	
 	PORTB = (0 << 5); // TEMP - Enrollment mode disabled
+	setMode(1);
+	displayLetter('a');
+	char test[5] = {'t', 'e', 's', 't', '\n'};
+	
+	displayLetters(test);
 	
 	uint8_t result;
 	while (1) {
