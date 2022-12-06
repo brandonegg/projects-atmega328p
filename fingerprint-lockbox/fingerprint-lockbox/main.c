@@ -328,6 +328,8 @@ void rotateStepper(uint8_t direction, uint16_t amount) {
 			_delay_ms(STEP_DELAY);
 		}
 	}
+	
+	PORTB = PORTB & 0xF0;
 }
 
 /************************************************************************/
