@@ -13,6 +13,7 @@
 
 #include <avr/io.h>
 #include <util/delay.h>
+#include "char_lcd_driver.h"
 
 // START OF UART
 /*
@@ -374,6 +375,11 @@ int main(void)
 	unsigned int ubrr = BAUD_RATE_230400_BPS;
 	UART_init(ubrr);
 	initStepper();
+
+	// LCD Library testing
+	LCD_Setup();
+	unsigned char test[5] = {'t','e','s','t', 0};
+	Message(test);
 
 	startFPS();
 	setLED(0);
