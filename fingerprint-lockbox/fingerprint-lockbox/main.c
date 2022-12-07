@@ -1,8 +1,8 @@
 /*
- * fingerprint-lockbox.c
+ * main.c
  *
  * Created: 11/30/2022 3:01:19 PM
- * Author : brand
+ * Author : Brandon Egger
  */ 
 
 #ifndef F_CPU
@@ -13,6 +13,7 @@
 
 #include <avr/io.h>
 #include <util/delay.h>
+#include "lcd_display.h"
 
 // START OF UART
 /*
@@ -374,6 +375,7 @@ int main(void)
 	unsigned int ubrr = BAUD_RATE_230400_BPS;
 	UART_init(ubrr);
 	initStepper();
+	initLCD();
 
 	startFPS();
 	setLED(0);
@@ -381,7 +383,8 @@ int main(void)
 	deleteFingerPrint(0xFF);
     enrollFinger(0x01);
 	
-	PORTB = (0 << 5); // TEMP - Enrollment mode disabled
+	char testMsg[] = "finger print enrolled!";
+	displayMessage(testMsg);
 	
 	uint8_t result;
 	while (1) {
