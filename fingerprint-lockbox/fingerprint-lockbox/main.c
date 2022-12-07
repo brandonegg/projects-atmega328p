@@ -64,11 +64,11 @@ void sendLCDCommand(uint8_t command) {
 /************************************************************************/
 void displayLetter(char letter) {
 	PORTC &= 0xF0; // Clear lower
-	PORTC |= 0x0F & getHighByte(letter);
+	PORTC |= 0x0F & getLowByte(letter);
 	pulseE();
 	_delay_ms(0.1); // 100us delay
 	PORTC &= 0xF0; // Clear lower
-	PORTC |= 0x0F & getLowByte(letter);
+	PORTC |= 0x0F & getHighByte(letter);
 	pulseE();
 	_delay_ms(0.1);
 }
@@ -88,7 +88,7 @@ void initLCD() {
 	_delay_ms(100);
 	setMode(0);
 	
-	uint8_t lcdRoutine[6] = {0x33, 0x32, 0x28, 0x01, 0x0c, 0x06};
+	uint8_t lcdRoutine[6] = {0x24, 0x24, 0x28, 0x01, 0x0c, 0x06};
 	for (int i = 0; i < 6; i++) {
 		sendLCDCommand(lcdRoutine[i]);
 	}
@@ -110,9 +110,7 @@ int main(void)
 	PORTB = (1 << 5);
 
 	initLCD();
-	char test[5] = {'t', 'e', 's', 't', '\n'};
+	char test[5] = {0x30, 0x31, 0x32, 0x34, '\n'};
 	
 	displayLetters(test);
 }
-
-
