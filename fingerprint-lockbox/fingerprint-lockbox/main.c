@@ -22,6 +22,14 @@ uint8_t getHighByte(uint16_t val) {
 	return (val >> 8) & 0xff;
 }
 
+uint8_t getLowNibble(uint8_t val) {
+	return (val & 0xf);
+}
+
+uint8_t getHighNibble(uint8_t val) {
+	return (val >> 4) & 0xf;
+}
+
 // START OF LCD
 /* The LCD is used to display helpful output to users of the lockbox
  */
@@ -50,11 +58,11 @@ void pulseE() {
 /************************************************************************/
 void sendLCDCommand(uint8_t command) {
 	PORTC &= 0xF0; // Clear lower
-	PORTC |= 0x0F & getHighByte(command);
+	PORTC |= 0x0F & getHighNibble(command);
 	pulseE();
 	_delay_ms(5); // 100us delay
 	PORTC &= 0xF0; // Clear lower
-	PORTC |= 0x0F & getLowByte(command);
+	PORTC |= 0x0F & getLowNibble(command);
 	pulseE();
 	_delay_ms(5);
 }
@@ -64,11 +72,11 @@ void sendLCDCommand(uint8_t command) {
 /************************************************************************/
 void displayLetter(char letter) {
 	PORTC &= 0xF0; // Clear lower
-	PORTC |= 0x0F & getLowByte(letter);
+	PORTC |= 0x0F & getHighNibble(letter);
 	pulseE();
 	_delay_ms(0.1); // 100us delay
 	PORTC &= 0xF0; // Clear lower
-	PORTC |= 0x0F & getHighByte(letter);
+	PORTC |= 0x0F & getLowNibble(letter);
 	pulseE();
 	_delay_ms(0.1);
 }
@@ -88,7 +96,7 @@ void initLCD() {
 	_delay_ms(100);
 	setMode(0);
 	
-	uint8_t lcdRoutine[6] = {0x24, 0x24, 0x28, 0x01, 0x0c, 0x06};
+	uint8_t lcdRoutine[6] = {0x33, 0x32, 0x28, 0x01, 0x0c, 0x06};
 	for (int i = 0; i < 6; i++) {
 		sendLCDCommand(lcdRoutine[i]);
 	}
@@ -110,7 +118,7 @@ int main(void)
 	PORTB = (1 << 5);
 
 	initLCD();
-	char test[5] = {0x30, 0x31, 0x32, 0x34, '\n'};
+	char test[5] = {'t', 'e', 's', 't', '\n'};
 	
 	displayLetters(test);
 }
