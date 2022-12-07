@@ -12,6 +12,7 @@ uint8_t stringBuffer[16] =
 
 void LCD_Setup(void)
 {
+	DDRC = 0xFF;
 	RS_LO;
 	
 	// 8-bit mode commands
