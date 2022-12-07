@@ -36,6 +36,7 @@ void pulseE() {
 
 /************************************************************************/
 /* Send LCD 8-bit command, requires command mode set to work            */
+/* - uint8_t command: command to send                                   */
 /************************************************************************/
 void sendLCDCommand(uint8_t command) {
 	PORTC &= 0xF0; // Clear lower
@@ -50,6 +51,7 @@ void sendLCDCommand(uint8_t command) {
 
 /************************************************************************/
 /* Display a single character inline, requires character mode set       */
+/* - char letter: letter to display at cursor                           */
 /************************************************************************/
 void displayLetter(char letter) {
 	PORTC &= 0xF0; // Clear lower
@@ -83,7 +85,19 @@ void initLCD() {
 	}
 }
 
-void displayMessage(char* str) {
+/************************************************************************/
+/* Clears the entire LCD display                                        */
+/************************************************************************/
+void clearDisplay() {
+	// TODO
+}
+
+/************************************************************************/
+/* Displays a string message to the LCD                                 */
+/* - uint8_t line: 0 for line 1, 1 for line 2                           */
+/* - char* str: Character string terminated with \0                     */
+/************************************************************************/
+void displayMessage(uint8_t line, char* str) {
 	setMode(1);
 	
 	while (*str != '\0') {

@@ -133,6 +133,12 @@
     </ToolchainSettings>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="fingerprint_reader.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="fingerprint_reader.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="lcd_display.c">
       <SubType>compile</SubType>
     </Compile>

@@ -1,5 +1,5 @@
 /*
- * lcd_display.c
+ * lcd_display.h
  *
  * Created: 12/07/2022 4:14:19 PM
  * Author : Brandon Egger
@@ -24,4 +24,4 @@ void displayLetter(char letter);
 
 // High level LCD controls
 void initLCD();
-void displayMessage(char* str);
+void displayMessage(uint8_t line, char* str);
