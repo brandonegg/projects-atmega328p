@@ -276,7 +276,7 @@ void verifyFinger(uint8_t id, uint8_t* output) {
 	sendFPSCommand(command, params, response);
 	if (response[4] == 0) {
 		*output = 0x01;
-		} else {
+	} else {
 		*output = 0x00;
 	}
 
