@@ -86,22 +86,35 @@ void initLCD() {
 }
 
 /************************************************************************/
-/* Clears the entire LCD display                                        */
+/* Set cursor to the given position                                     */
 /************************************************************************/
-void clearDisplay() {
-	// TODO
+void clearLCD() {
+	sendLCDCommand(0x01); // Clear display: 0b00000001
+	_delay_ms(5); // Max delay for clear command
 }
 
 /************************************************************************/
-/* Displays a string message to the LCD                                 */
-/* - uint8_t line: 0 for line 1, 1 for line 2                           */
-/* - char* str: Character string terminated with \0                     */
+/* Displays a string message to a given LCD line                        */
+/* - char* line1: text for line 1                                       */
+/* - char* line2: text for line 2                                       */
 /************************************************************************/
-void displayMessage(uint8_t line, char* str) {
+void displayLCDMessage(char* line1, char* line2) {
+	setMode(0);
+	clearLCD();
+	sendLCDCommand(0b00000010); // send cursor home
 	setMode(1);
 	
-	while (*str != '\0') {
-		displayLetter(*str);
-		str++;
+	while (*line1 != '\0') {
+		displayLetter(*line1);
+		line1++;
+	}
+	
+	setMode(0);
+	sendLCDCommand(0b11000000); // Set cursor to second row start
+	setMode(1);
+
+	while (*line2 != '\0') {
+		displayLetter(*line2);
+		line2++;
 	}
 }

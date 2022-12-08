@@ -80,32 +80,33 @@ void initStepper() {
 	PORTB = PORTB & 0xf0; // Set those pins to off
 }
 
+// Basic Application Flow Helpers
+
 int main(void)
 {
-	//TESTING STATUS L LED - PROGRAM MODE LIT
-	DDRB = (1 << 5);
-	PORTB = (1 << 5);
-	
+	// Runtime Values
 	unsigned int ubrr = BAUD_RATE_230400_BPS;
+
+	// Initializers
 	UART_init(ubrr);
 	initStepper();
 	initLCD();
-
 	startFPS();
-	setLED(0);
+	setFPSLED(0);
 	
 	deleteFingerPrint(0xFF);
     enrollFinger(0x01);
-	
-	char testMsg[] = "finger print yay!";
-	displayMessage(0, testMsg);
 	
 	uint8_t result;
 	while (1) {
 		verifyFinger(0x01, &result);
 		
 		if (result >= 0x01) {
+			displayLCDMessage("Success!", "");
 			toggleOpen();
+		} else {
+			displayLCDMessage("ERROR: Finger", "not recognized");
+			_delay_ms(5000);
 		}
 	}
 	

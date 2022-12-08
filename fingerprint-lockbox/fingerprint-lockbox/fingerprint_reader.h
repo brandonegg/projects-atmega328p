@@ -11,6 +11,7 @@
 // Dependencies
 #include <avr/io.h>
 #include <util/delay.h>
+#include "lcd_display.h"
 
 // FPS Command Codes
 #define COMMAND_START_CODE_1 0x55
@@ -32,8 +33,8 @@ uint8_t getHighByte(uint16_t val);
 
 // Finger print reader (low-level)
 void sendFPSCommand(uint16_t command, uint8_t* params, uint8_t* retBuff);
-void handleEnrollStep(uint8_t step);
-void setLED(uint8_t on);
+uint8_t handleEnrollStep(uint8_t step);
+void setFPSLED(uint8_t on);
 void waitForFingerPressed();
 void waitForFingerRelease();
 

@@ -192,7 +192,7 @@ void deleteFingerPrint(uint16_t id) {
 /* Send start fingerprint enrollment command                            */
 /* uint8_t step: enroll step (0-2)                                      */
 /************************************************************************/
-void handleEnrollStep(uint8_t step) {
+uint8_t handleEnrollStep(uint8_t step) {
 	uint16_t command = 0x0023 + step; // Enroll 23 = Enroll 1, step is offset
 	uint8_t params[4] = {0x00, 0x00, 0x00, 0x00};
 	uint8_t response[12];
@@ -201,12 +201,14 @@ void handleEnrollStep(uint8_t step) {
 	if (response[4] == 0x31) { // Bad finger - 0x100C or 0x100D
 		PORTB = (1 << 5); // there was error
 	}
+
+	return response[8];
 }
 
 /************************************************************************/
 /* Shortcut for turning LED on/off                                      */
 /************************************************************************/
-void setLED(uint8_t on) {
+void setFPSLED(uint8_t on) {
 	uint16_t command = 0x0012; // Start command 0x01
 	uint8_t params[4] = {on, 0x00, 0x00, 0x00};
 	uint8_t response[12];
@@ -252,7 +254,8 @@ void verifyFinger(uint8_t id, uint8_t* output) {
 	uint8_t params[4] = {getLowByte(id), getHighByte(id), 0x00, 0x00};
 	uint8_t response[12];
 	
-	setLED(1);
+	setFPSLED(1);
+	displayLCDMessage("Tap finger", "to unlock");
 	waitForFingerPressed();
 	captureFingerPrint();
 	sendFPSCommand(command, params, response);
@@ -262,23 +265,36 @@ void verifyFinger(uint8_t id, uint8_t* output) {
 		*output = 0x00;
 	}
 
+	displayLCDMessage("Release Finger", "");
 	waitForFingerRelease();
-	setLED(0);
+	setFPSLED(0);
 }
 
 /************************************************************************/
 /* Handles the entire fingerprint enrollment flow                       */
 /************************************************************************/
 void enrollFinger(uint16_t id) {
-	setLED(1);
-	startFingerEnroll(id);
+	uint8_t responseCode = 0x31;
+	while (responseCode == 0x31) {
+		setFPSLED(1);
+		startFingerEnroll(id);
+
+		for (int i = 0; i < 3; i++) {
+			displayLCDMessage("Place finger on", "scanner");
+			waitForFingerPressed();
+			captureFingerPrint();
+			responseCode = handleEnrollStep(i);
+			displayLCDMessage("Release finger", "");
+			waitForFingerRelease();
+		}
 	
-	for (int i = 0; i < 3; i++) {
-		waitForFingerPressed();
-		captureFingerPrint();
-		handleEnrollStep(i);
-		waitForFingerRelease();
+		setFPSLED(0);
+
+		if (responseCode == 0x31) {
+			displayLCDMessage("Error reading...,", "Please try again!");
+		} else {
+			displayLCDMessage("Success", "Finger Enrolled!");
+		}
+		_delay_ms(5000);
 	}
-	
-	setLED(0);
 }

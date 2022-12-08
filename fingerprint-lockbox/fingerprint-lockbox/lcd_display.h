@@ -24,4 +24,5 @@ void displayLetter(char letter);
 
 // High level LCD controls
 void initLCD();
-void displayMessage(uint8_t line, char* str);
+void displayLCDMessage(char* line1, char* line2);
+void clearLCD();
