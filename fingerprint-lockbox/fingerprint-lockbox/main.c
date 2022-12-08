@@ -99,6 +99,11 @@ int main(void)
 	
 	uint8_t result;
 	while (1) {
+		if (open_state == 0) {
+			displayLCDMessage("Tap finger", "to unlock");
+		} else {
+			displayLCDMessage("Tap finger", "to lock");
+		}
 		verifyFinger(0x01, &result);
 		
 		if (result >= 0x01) {

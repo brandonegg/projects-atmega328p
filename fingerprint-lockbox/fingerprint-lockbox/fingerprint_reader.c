@@ -255,7 +255,6 @@ void verifyFinger(uint8_t id, uint8_t* output) {
 	uint8_t response[12];
 	
 	setFPSLED(1);
-	displayLCDMessage("Tap finger", "to unlock");
 	waitForFingerPressed();
 	captureFingerPrint();
 	sendFPSCommand(command, params, response);
